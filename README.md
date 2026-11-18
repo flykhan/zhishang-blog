@@ -74,6 +74,8 @@ status: published
 **从 Halo / Hexo / Hugo 等博客迁移**：先从原博客导出 Markdown（保留 frontmatter），再批量导入；
 图片建议上传到数据卷的 `/data/uploads/`，Markdown 中用 `/uploads/图片名` 引用即可随站点一起提供。
 
+> 安全提示：文章内容按「管理员可信内容」处理，Markdown 中的内联 HTML 会被原样渲染；导入第三方来源的 HTML 前请先自行清洗。
+
 ---
 
 ## 技术栈
