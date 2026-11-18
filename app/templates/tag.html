@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_pagination.html" import render with context %}
+{% from "_post_card.html" import card %}
 
 {% block title %}标签：{{ tag }} · {{ site.site_title }}{% endblock %}
 {% block meta_description %}浏览「{{ site.site_title }}」中标签为「{{ tag }}」的文章。{% endblock %}
@@ -15,32 +16,7 @@
 
   {% if posts %}
     <div class="post-list">
-      {% for post in posts %}
-        <article class="post-card">
-          <p class="post-meta">
-            <time datetime="{{ post.published_at }}">{{ post.published_at|date }}</time>
-            <span class="meta-sep" aria-hidden="true">·</span>
-            <span>约 {{ post.reading_time }} 分钟</span>
-          </p>
-          <h2 class="post-card-title"><a href="/post/{{ post.slug|urlencode }}">{{ post.title }}</a></h2>
-          {% if post.summary %}
-            <p class="post-card-summary">{{ post.summary|clean_summary }}</p>
-          {% endif %}
-          {% set post_tags = post.tags|taglist %}
-          <div class="post-card-foot">
-            {% if post_tags %}
-              <ul class="tag-list" aria-label="文章标签">
-                {% for post_tag in post_tags %}
-                  <li><a class="tag" href="/tag/{{ post_tag|urlencode }}">{{ post_tag }}</a></li>
-                {% endfor %}
-              </ul>
-            {% else %}
-              <span class="post-views">未设标签</span>
-            {% endif %}
-            <span class="post-views">{{ post.views }} 次阅读</span>
-          </div>
-        </article>
-      {% endfor %}
+      {% for post in posts %}{{ card(post) }}{% endfor %}
     </div>
   {% else %}
     <div class="empty">

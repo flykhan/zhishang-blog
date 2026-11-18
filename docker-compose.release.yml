@@ -13,7 +13,7 @@
 
 services:
   blog:
-    image: flykhan/zhishang-blog:1.0.0
+    image: flykhan/zhishang-blog:1.1.0
     container_name: zhishang-blog
     # 容器内固定监听 8000；默认只绑定本机，公网访问走反向代理
     ports:

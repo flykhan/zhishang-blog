@@ -1,51 +1,74 @@
 {% extends "base.html" %}
 {% from "_pagination.html" import render with context %}
+{% from "_post_card.html" import card %}
 
 {% block title %}{% if pagination.page > 1 %}第 {{ pagination.page }} 页 · {% endif %}{{ site.site_title }}{% endblock %}
 
 {% block content %}
-  <header class="page-head">
-    <p class="kicker">{% if pagination.page > 1 %}第 {{ pagination.page }} 页{% else %}最新发布{% endif %}</p>
-    <h1 class="page-title">{% if pagination.page > 1 %}继续阅读{% else %}近日文章{% endif %}</h1>
-    {% if pagination.page == 1 and pagination.total_items > 0 %}
-      <p class="page-sub">共 {{ pagination.total_items }} 篇文字，愿你在纸页间慢慢读。</p>
-    {% endif %}
-  </header>
+  {% if pagination.page == 1 %}
+    <section class="home-hero">
+      <p class="home-hero-eyebrow">{{ site.site_subtitle }}</p>
+      <p class="home-hero-lede">{{ site.site_description }}</p>
+      <p class="home-hero-meta">
+        <span>{{ site.author_name }}</span>
+        <span class="meta-sep" aria-hidden="true">·</span>
+        <span>{{ pagination.total_items }} 篇文章</span>
+        <span class="meta-sep" aria-hidden="true">·</span>
+        <a href="/feed.xml">RSS 订阅</a>
+      </p>
+    </section>
 
-  {% if posts %}
-    <div class="post-list">
-      {% for post in posts %}
-        <article class="post-card">
-          <p class="post-meta">
-            <time datetime="{{ post.published_at }}">{{ post.published_at|date }}</time>
-            <span class="meta-sep" aria-hidden="true">·</span>
-            <span>约 {{ post.reading_time }} 分钟</span>
-          </p>
-          <h2 class="post-card-title"><a href="/post/{{ post.slug|urlencode }}">{{ post.title }}</a></h2>
-          {% if post.summary %}
-            <p class="post-card-summary">{{ post.summary|clean_summary }}</p>
+    {% if featured %}
+      <article class="featured-post">
+        {% if featured.cover_url %}
+          <a class="featured-cover" href="/post/{{ featured.slug|urlencode }}">
+            <img src="{{ featured.cover_url }}" alt="">
+          </a>
+        {% endif %}
+        <div class="featured-body">
+          <p class="kicker">精选</p>
+          <h2 class="featured-title"><a href="/post/{{ featured.slug|urlencode }}">{{ featured.title }}</a></h2>
+          {% if featured.summary %}
+            <p class="featured-summary">{{ featured.summary|clean_summary }}</p>
           {% endif %}
-          {% set post_tags = post.tags|taglist %}
-          <div class="post-card-foot">
-            {% if post_tags %}
-              <ul class="tag-list" aria-label="文章标签">
-                {% for tag in post_tags %}
-                  <li><a class="tag" href="/tag/{{ tag|urlencode }}">{{ tag }}</a></li>
-                {% endfor %}
-              </ul>
-            {% else %}
-              <span class="post-views">未设标签</span>
-            {% endif %}
-            <span class="post-views">{{ post.views }} 次阅读</span>
-          </div>
-        </article>
-      {% endfor %}
-    </div>
+          <p class="featured-meta">
+            <time datetime="{{ featured.published_at }}">{{ featured.published_at|date }}</time>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <span>约 {{ featured.reading_time }} 分钟</span>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <a class="featured-more" href="/post/{{ featured.slug|urlencode }}">阅读全文 →</a>
+          </p>
+        </div>
+      </article>
+      <p class="rule-title">最新文章</p>
+    {% endif %}
+
+    {% if posts %}
+      <div class="post-list">
+        {% for post in posts %}{{ card(post) }}{% endfor %}
+      </div>
+    {% elif not featured %}
+      <div class="empty">
+        <p class="empty-title">还没有文章</p>
+        <p>纸页留着空白，等待第一篇文字落下。</p>
+      </div>
+    {% endif %}
   {% else %}
-    <div class="empty">
-      <p class="empty-title">还没有文章</p>
-      <p>纸页留着空白，等待第一篇文字落下。</p>
-    </div>
+    <header class="page-head">
+      <p class="kicker">第 {{ pagination.page }} 页</p>
+      <h1 class="page-title">继续阅读</h1>
+    </header>
+
+    {% if posts %}
+      <div class="post-list">
+        {% for post in posts %}{{ card(post) }}{% endfor %}
+      </div>
+    {% else %}
+      <div class="empty">
+        <p class="empty-title">还没有文章</p>
+        <p>纸页留着空白，等待第一篇文字落下。</p>
+      </div>
+    {% endif %}
   {% endif %}
 
   {{ render(pagination) }}

@@ -1,0 +1,32 @@
+{# 公共文章卡片宏：index / tag / search 共用，类名供 UI 样式与 JS 依赖。 #}
+{% macro card(post) -%}
+  <article class="post-card{% if post.cover_url %} post-card--with-cover{% endif %}">
+    {% if post.cover_url %}
+      <a class="post-card-cover" href="/post/{{ post.slug|urlencode }}" tabindex="-1" aria-hidden="true">
+        <img src="{{ post.cover_url }}" alt="" loading="lazy" decoding="async">
+      </a>
+    {% endif %}
+    <p class="post-meta">
+      <time datetime="{{ post.published_at }}">{{ post.published_at|date }}</time>
+      <span class="meta-sep" aria-hidden="true">·</span>
+      <span>约 {{ post.reading_time }} 分钟</span>
+    </p>
+    <h2 class="post-card-title"><a href="/post/{{ post.slug|urlencode }}">{{ post.title }}</a></h2>
+    {% if post.summary %}
+      <p class="post-card-summary">{{ post.summary|clean_summary }}</p>
+    {% endif %}
+    {% set post_tags = post.tags|taglist %}
+    <div class="post-card-foot">
+      {% if post_tags %}
+        <ul class="tag-list" aria-label="文章标签">
+          {% for post_tag in post_tags %}
+            <li><a class="tag" href="/tag/{{ post_tag|urlencode }}">{{ post_tag }}</a></li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <span class="post-views">未设标签</span>
+      {% endif %}
+      <span class="post-views">{{ post.views }} 次阅读</span>
+    </div>
+  </article>
+{%- endmacro %}

@@ -8,10 +8,11 @@ from collections import Counter
 from datetime import datetime, timezone
 
 from . import db
+from .config import settings
 from .utils import (
     excerpt,
-    local_year,
     normalize_tags,
+    parse_iso,
     plain_text,
     reading_time,
     slugify,
@@ -260,23 +261,46 @@ def all_tags() -> list[dict]:
 
 
 def archive_groups() -> list[dict]:
+    """按「年 → 月」聚合已发布文章，年份/月份降序、组内发布时间降序。
+
+    返回 [{"year": int, "count": int, "months": [{"month": int, "count": int, "posts": [...]}]}]；
+    排序键与列表页一致（COALESCE(published_at, created_at)），兼容无 published_at 的迁移数据。
+    """
     with db.get_conn() as con:
         rows = con.execute(
             "SELECT slug, title, published_at, created_at FROM posts "
             "WHERE status = 'published' "
             "ORDER BY COALESCE(published_at, created_at) DESC, id DESC"
         ).fetchall()
-    groups: dict[int, list[dict]] = {}
+
+    groups: dict[int, dict[int, list[dict]]] = {}
     for row in rows:
-        year = local_year(row["published_at"] or row["created_at"])
-        groups.setdefault(year, []).append(
+        published_at = row["published_at"] or row["created_at"]
+        dt = parse_iso(published_at)
+        if dt is not None:
+            local = dt.astimezone(settings.timezone)
+            year, month = local.year, local.month
+        else:  # 极端脏数据：归入 0 年 0 月，保证模板仍可渲染
+            year, month = 0, 0
+        groups.setdefault(year, {}).setdefault(month, []).append(
+            {"slug": row["slug"], "title": row["title"], "published_at": published_at}
+        )
+
+    result: list[dict] = []
+    for year in sorted(groups, reverse=True):
+        months = groups[year]
+        month_groups = [
+            {"month": month, "count": len(months[month]), "posts": months[month]}
+            for month in sorted(months, reverse=True)
+        ]
+        result.append(
             {
-                "slug": row["slug"],
-                "title": row["title"],
-                "published_at": row["published_at"] or row["created_at"],
+                "year": year,
+                "count": sum(item["count"] for item in month_groups),
+                "months": month_groups,
             }
         )
-    return [{"year": year, "posts": groups[year]} for year in sorted(groups, reverse=True)]
+    return result
 
 
 # ---------------------------------------------------------------- 文章：后台

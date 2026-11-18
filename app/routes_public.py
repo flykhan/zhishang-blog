@@ -104,6 +104,31 @@ def _absolute_image_url(url: str) -> str:
     return f"{settings.site_url_base}/{path.lstrip('/')}"
 
 
+def _card_cover(post: dict) -> str:
+    """列表卡片封面：正文第一张图。
+
+    相对路径（如 /uploads/x.png）原样返回，`//` 补 https:，http(s) 原样，
+    其他协议（data: 等）与无图返回空串。
+    """
+    url = _first_content_image(post.get("content_md") or "")
+    if not url:
+        return ""
+    if url.startswith("//"):
+        return "https:" + url
+    if url.lower().startswith(("http://", "https://")):
+        return url
+    if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", url):
+        return ""
+    return url
+
+
+def _with_covers(posts: list[dict]) -> list[dict]:
+    """给列表页文章 dict 补 cover_url 键（原地补充并返回同一列表）。"""
+    for post in posts:
+        post["cover_url"] = _card_cover(post)
+    return posts
+
+
 def _jsonld_date(value) -> str:
     dt = parse_iso(value)
     return dt.isoformat() if dt else ""
@@ -157,12 +182,18 @@ def _index_page(request: Request, page: int):
         target = "/" if clamped == 1 else f"/page/{clamped}"
         return RedirectResponse(target, status_code=301)
     page = clamped
-    posts = repo.list_published(per_page, (page - 1) * per_page)
+    posts = _with_covers(repo.list_published(per_page, (page - 1) * per_page))
+    featured = None
+    if page == 1 and posts:
+        # 首页第一屏：第一篇为精选 Hero，其余作为最新文章列表；第 2 页起不带 featured。
+        featured = posts[0]
+        posts = posts[1:]
     page_title = "首页" if page == 1 else f"第 {page} 页"
     return render(
         request,
         "index.html",
         posts=posts,
+        featured=featured,
         pagination=_pagination(page, total_pages, total, "/"),
         page_title=page_title,
     )
@@ -270,7 +301,7 @@ def _tag_page(request: Request, tag: str, page: int):
         )
         return RedirectResponse(target, status_code=301)
     page = clamped
-    posts = repo.list_posts_by_tag(tag, per_page, (page - 1) * per_page)
+    posts = _with_covers(repo.list_posts_by_tag(tag, per_page, (page - 1) * per_page))
     return render(
         request,
         "tag.html",
@@ -284,7 +315,7 @@ def _tag_page(request: Request, tag: str, page: int):
 @router.get("/search", response_class=HTMLResponse)
 def search(request: Request):
     query = (request.query_params.get("q") or "").strip()[:80]
-    posts = repo.search_posts(query) if query else []
+    posts = _with_covers(repo.search_posts(query)) if query else []
     return render(
         request,
         "search.html",
@@ -295,6 +326,30 @@ def search(request: Request):
     )
 
 
+@router.get("/api/search")
+def api_search(request: Request):
+    """即时搜索 JSON API：只读、最多 20 条，不返回正文。"""
+    query = (request.query_params.get("q") or "").strip()[:80]
+    if not query:
+        return JSONResponse({"query": "", "total": 0, "results": []})
+    posts = repo.search_posts(query, limit=20)
+    results = [
+        {
+            "title": post["title"],
+            "slug": post["slug"],
+            "summary": clean_summary(post["summary"]),
+            "published_at": post["published_at"] or post["created_at"],
+            "reading_time": post["reading_time"],
+            "tags": post["tags"] or "",
+            "cover_url": _card_cover(post),
+        }
+        for post in posts
+    ]
+    return JSONResponse(
+        {"query": query, "total": repo.count_search_posts(query), "results": results}
+    )
+
+
 @router.get("/archive", response_class=HTMLResponse)
 def archive(request: Request):
     return render(request, "archive.html", groups=repo.archive_groups(), page_title="归档")
@@ -302,7 +357,13 @@ def archive(request: Request):
 
 @router.get("/about", response_class=HTMLResponse)
 def about(request: Request):
-    return render(request, "about.html", page_title="关于")
+    return render(
+        request,
+        "about.html",
+        post_count=repo.count_published(),
+        tag_count=len(repo.all_tags()),
+        page_title="关于",
+    )
 
 
 # ---------------------------------------------------------------- Feed / SEO / 健康检查

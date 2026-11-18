@@ -15,7 +15,7 @@
   {% if tags %}
     <div class="tag-cloud">
       {% for tag in tags %}
-        <a class="tag-cloud-item" href="/tag/{{ tag.name|urlencode }}">
+        <a class="tag-cloud-item{% if tag.count >= 5 %} tag-cloud-item--lg{% elif tag.count >= 3 %} tag-cloud-item--md{% else %} tag-cloud-item--sm{% endif %}" href="/tag/{{ tag.name|urlencode }}">
           <span class="tag-name">{{ tag.name }}</span>
           <span class="tag-count" aria-label="{{ tag.count }} 篇文章">{{ tag.count }}</span>
         </a>

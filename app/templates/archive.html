@@ -8,7 +8,7 @@
     <p class="kicker">按年归档</p>
     <h1 class="page-title">归档</h1>
     {% if groups %}
-      <p class="page-sub">所有文章按发表年份收拢在这里。</p>
+      <p class="page-sub">所有文章按发表年份与月份收拢在这里。</p>
     {% endif %}
   </header>
 
@@ -18,15 +18,21 @@
         <section class="archive-group" aria-labelledby="archive-year-{{ group.year }}">
           <h2 class="archive-year" id="archive-year-{{ group.year }}">
             {{ group.year }}<span class="archive-year-sub">年</span>
+            <span class="archive-year-count">{{ group.count }} 篇</span>
           </h2>
-          <ul class="archive-list">
-            {% for post in group.posts %}
-              <li class="archive-item">
-                <time class="archive-date" datetime="{{ post.published_at }}">{{ post.published_at|date("%m月%d日") }}</time>
-                <a class="archive-title" href="/post/{{ post.slug|urlencode }}">{{ post.title }}</a>
-              </li>
-            {% endfor %}
-          </ul>
+          {% for month in group.months %}
+            <div class="archive-month">
+              <h3 class="archive-month-title">{{ "%02d"|format(month.month) }} 月 <span class="archive-month-count">{{ month.count }} 篇</span></h3>
+              <ul class="archive-list">
+                {% for post in month.posts %}
+                  <li class="archive-item">
+                    <time class="archive-date" datetime="{{ post.published_at }}">{{ post.published_at|date("%m月%d日") }}</time>
+                    <a class="archive-title" href="/post/{{ post.slug|urlencode }}">{{ post.title }}</a>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
         </section>
       {% endfor %}
     </div>

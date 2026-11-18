@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_post_card.html" import card %}
 
 {% block title %}{% if query %}搜索「{{ query }}」{% else %}搜索{% endif %} · {{ site.site_title }}{% endblock %}
 {% block meta_description %}在「{{ site.site_title }}」中搜索文章标题、摘要与正文。{% endblock %}
@@ -9,57 +10,41 @@
     <h1 class="page-title">搜索</h1>
   </header>
 
-  <form class="search-form" action="/search" method="get" role="search">
+  <form class="search-form" action="/search" method="get" role="search" data-instant-search>
     <label class="sr-only" for="search-q">搜索关键词</label>
     <input type="search" id="search-q" name="q" value="{{ query|default('') }}" placeholder="输入关键词，如 FastAPI、随笔……" autocomplete="off" enterkeyhint="search">
     <button class="btn btn-primary" type="submit">搜索</button>
   </form>
 
-  {% if query %}
-    <p class="page-sub">
-      {% if total %}
+  <p class="search-status" id="search-status" role="status" aria-live="polite">
+    {%- if query -%}
+      {%- if total -%}
         找到 {{ total }} 篇与「{{ query }}」相关的文章。
-      {% else %}
+      {%- else -%}
         没有找到与「{{ query }}」相关的文章。
-      {% endif %}
-    </p>
+      {%- endif -%}
+    {%- endif -%}
+  </p>
 
+  <div id="search-results">
     {% if posts %}
       <div class="post-list">
-        {% for post in posts %}
-          <article class="post-card">
-            <p class="post-meta">
-              <time datetime="{{ post.published_at }}">{{ post.published_at|date }}</time>
-              <span class="meta-sep" aria-hidden="true">·</span>
-              <span>约 {{ post.reading_time }} 分钟</span>
-            </p>
-            <h2 class="post-card-title"><a href="/post/{{ post.slug|urlencode }}">{{ post.title }}</a></h2>
-            {% if post.summary %}
-              <p class="post-card-summary">{{ post.summary|clean_summary }}</p>
-            {% endif %}
-            {% set post_tags = post.tags|taglist %}
-            <div class="post-card-foot">
-              {% if post_tags %}
-                <ul class="tag-list" aria-label="文章标签">
-                  {% for tag in post_tags %}
-                    <li><a class="tag" href="/tag/{{ tag|urlencode }}">{{ tag }}</a></li>
-                  {% endfor %}
-                </ul>
-              {% else %}
-                <span class="post-views">未设标签</span>
-              {% endif %}
-              <span class="post-views">{{ post.views }} 次阅读</span>
-            </div>
-          </article>
-        {% endfor %}
+        {% for post in posts %}{{ card(post) }}{% endfor %}
       </div>
-    {% else %}
+    {% elif query %}
       <div class="empty">
         <p class="empty-title">换个关键词试试</p>
         <p>可以尝试更短的词，或浏览 <a href="/tags">全部标签</a> 与 <a href="/archive">归档</a>。</p>
       </div>
     {% endif %}
-  {% else %}
+  </div>
+
+  <div id="search-empty" class="empty" hidden>
+    <p class="empty-title">没有找到相关文章</p>
+    <p>可以尝试更短的词，或浏览 <a href="/tags">全部标签</a> 与 <a href="/archive">归档</a>。</p>
+  </div>
+
+  {% if not query %}
     <div class="empty">
       <p class="empty-title">输入关键词开始检索</p>
       <p>可以搜索文章标题、摘要与正文，支持中文与英文。</p>
