@@ -7,8 +7,26 @@
   <meta name="theme-color" content="#faf8f4">
   <title>{% block title %}{{ site.site_title }}{% endblock %}</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="alternate icon" href="/static/favicon.ico" type="image/x-icon">
   <link rel="alternate" type="application/rss+xml" title="{{ site.site_title }} · RSS" href="/feed.xml">
   <link rel="canonical" href="{{ site_url }}{{ request.url.path }}">
+  {#- Open Graph / Twitter Card：base 提供全站默认值，文章页通过 block 覆盖。 -#}
+  <meta property="og:site_name" content="{{ site.site_title }}">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  <meta property="og:title" content="{% block og_title %}{{ site.site_title }}{% endblock %}">
+  <meta property="og:description" content="{% block og_description %}{{ site.site_description }}{% endblock %}">
+  <meta property="og:image" content="{% block og_image %}{{ site_url }}/static/og-default.png{% endblock %}">
+  <meta property="og:url" content="{{ site_url }}{{ request.url.path }}">
+  <meta name="twitter:card" content="{% block twitter_card %}summary_large_image{% endblock %}">
+  <meta name="twitter:title" content="{% block twitter_title %}{{ site.site_title }}{% endblock %}">
+  <meta name="twitter:description" content="{% block twitter_description %}{{ site.site_description }}{% endblock %}">
+  <meta name="twitter:image" content="{% block twitter_image %}{{ site_url }}/static/og-default.png{% endblock %}">
+  {% block og_extra %}{% endblock %}
+  {#- JSON-LD：站点级 WebSite 结构化数据（后端已做脚本内闭合转义）。 -#}
+  <script type="application/ld+json">{{ site_jsonld|safe }}</script>
+  {% block jsonld %}{% endblock %}
   <script>
     (function () {
       try {
@@ -22,7 +40,7 @@
       }
     })();
   </script>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ asset_version }}">
   {% block head %}{% endblock %}
 </head>
 <body class="site-body {% block body_class %}{% endblock %}">
@@ -88,6 +106,6 @@
     </div>
   </footer>
   <button class="to-top" id="to-top" type="button" aria-label="返回顶部" aria-hidden="true" title="返回顶部">↑</button>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{ asset_version }}"></script>
 </body>
 </html>

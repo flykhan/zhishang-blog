@@ -118,6 +118,40 @@ def taglist(raw) -> list[str]:
     return [tag.strip() for tag in str(raw).split(",") if tag.strip()]
 
 
+_WIKI_LINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\](?:\[\1\])?")
+_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+_HR_RE = re.compile(r"^[ \t]*([-*_=])(?:[ \t]*\1){2,}[ \t]*$", re.M)
+_QUOTE_RE = re.compile(r"^[ \t]*>[ \t]?", re.M)
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_EMPHASIS_RE = re.compile(r"[*_~`]+")
+
+
+def clean_summary(text: str, length: int = 0) -> str:
+    """把自动摘要里的 Markdown 残留清洗成适合展示的纯文本。
+
+    用于首页卡片、文章导语、RSS description、OG/JSON-LD description；
+    不修改数据库里的原始 summary，后台编辑仍看到原文。
+    """
+    if not text:
+        return ""
+    cleaned = str(text)
+    cleaned = _WIKI_LINK_RE.sub(lambda m: m.group(2) or m.group(1), cleaned)
+    cleaned = _MD_IMAGE_RE.sub(" ", cleaned)
+    cleaned = _MD_LINK_RE.sub(r"\1", cleaned)
+    cleaned = re.sub(r"\[([^\[\]]+)\]", r"\1", cleaned)  # 残留的单层方括号
+    cleaned = _HR_RE.sub(" ", cleaned)
+    cleaned = _QUOTE_RE.sub("", cleaned)
+    cleaned = re.sub(r"(?:^|\s)>\s+", " ", cleaned)  # 行内引用符（如 “> 内容”）
+    cleaned = _HTML_TAG_RE.sub(" ", cleaned)
+    cleaned = _EMPHASIS_RE.sub("", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = cleaned.lstrip(" -—–·*>|")
+    if length and len(cleaned) > length:
+        cleaned = cleaned[:length].rstrip() + "…"
+    return cleaned
+
+
 def format_footer(text: str) -> str:
     year = datetime.now(settings.timezone).year
     return (text or "").replace("{year}", str(year))

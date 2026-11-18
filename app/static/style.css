@@ -22,6 +22,8 @@
   --radius: 10px;
   --maxw: 720px;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+  --header-bg: rgba(250, 248, 244, 0.78);
+  --header-bg-stuck: rgba(250, 248, 244, 0.93);
 
   /* 公共页扩展 token（不属于契约，仅供公共界面内部使用） */
   --grain: rgba(29, 28, 26, 0.035);
@@ -41,6 +43,8 @@
   --accent-soft: rgba(224, 138, 95, 0.14);
   --code-bg: #201f1c;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.25);
+  --header-bg: rgba(20, 20, 18, 0.74);
+  --header-bg-stuck: rgba(20, 20, 18, 0.92);
 
   --grain: rgba(233, 229, 220, 0.03);
   --ok: #8fbfa0;
@@ -201,9 +205,34 @@ button {
 /* ---------- 5. 页头 ---------- */
 
 .site-header {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 90;
   padding-top: 2.75rem;
   border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  transition: padding-top 0.25s ease, background-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.site-header.is-stuck {
+  padding-top: 0.85rem;
+  background: var(--header-bg-stuck);
+  box-shadow: 0 14px 32px -24px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .site-header.is-stuck {
+  box-shadow: 0 14px 32px -20px rgba(0, 0, 0, 0.8);
+}
+
+/* 不支持 backdrop-filter 时退回不透明背景，保证文字始终清晰。 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .site-header,
+  .site-header.is-stuck {
+    background: var(--bg);
+  }
 }
 
 .header-wrap {
@@ -227,6 +256,24 @@ button {
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: 0.14em;
+  transition: color 0.18s ease, font-size 0.25s ease, letter-spacing 0.25s ease,
+    padding-bottom 0.25s ease;
+}
+
+/* 品牌印章：纯图形（不产生文字节点，避免屏幕阅读器重复朗读），
+   赤陶方章 + 纸色内芯，随标题字号缩放并轻微旋转。 */
+.masthead-title::before {
+  content: "";
+  display: inline-block;
+  width: 0.52em;
+  height: 0.52em;
+  margin-right: 0.16em;
+  border-radius: 0.1em;
+  background: linear-gradient(var(--bg), var(--bg)) center / 46% 46% no-repeat,
+    var(--accent);
+  transform: rotate(-5deg);
+  vertical-align: middle;
+  transition: transform 0.25s ease;
 }
 
 .masthead-title:hover,
@@ -235,12 +282,15 @@ button {
 }
 
 .masthead-subtitle {
+  max-height: 4.5rem;
   margin: 0.85rem 0 0;
+  overflow: hidden;
   color: var(--muted);
   font-family: var(--font-serif);
   font-size: 0.95rem;
   font-style: italic;
   letter-spacing: 0.06em;
+  transition: max-height 0.25s ease, margin-top 0.25s ease, opacity 0.25s ease;
 }
 
 .header-actions {
@@ -249,6 +299,7 @@ button {
   align-items: center;
   gap: 0.35rem;
   margin-top: 0.35rem;
+  transition: margin-top 0.25s ease;
 }
 
 .icon-btn {
@@ -263,7 +314,8 @@ button {
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+  transition: color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease,
+    width 0.25s ease, height 0.25s ease;
 }
 
 .icon-btn:hover {
@@ -299,6 +351,7 @@ button {
 .site-nav {
   margin-top: 1.5rem;
   border-top: 1px solid var(--border);
+  transition: margin-top 0.25s ease;
 }
 
 .nav-wrap {
@@ -322,7 +375,7 @@ button {
   color: var(--muted);
   font-size: 0.82rem;
   letter-spacing: 0.22em;
-  transition: color 0.18s ease;
+  transition: color 0.18s ease, padding 0.25s ease;
 }
 
 .nav-link::after {
@@ -350,6 +403,41 @@ button {
 .nav-link.is-active,
 .nav-link[aria-current="page"] {
   color: var(--text);
+}
+
+/* 下滚后的收紧状态：标题缩小、副标题收起、上下留白压缩。 */
+.site-header.is-stuck .masthead-title {
+  padding-bottom: 0.1rem;
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+}
+
+.site-header.is-stuck .masthead-title::before {
+  transform: rotate(-3deg) scale(0.92);
+}
+
+.site-header.is-stuck .masthead-subtitle {
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+}
+
+.site-header.is-stuck .header-actions {
+  margin-top: 0;
+}
+
+.site-header.is-stuck .icon-btn {
+  width: 2.1rem;
+  height: 2.1rem;
+}
+
+.site-header.is-stuck .site-nav {
+  margin-top: 0.3rem;
+}
+
+.site-header.is-stuck .nav-link {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
 }
 
 /* ---------- 6. Flash 提示 ---------- */
@@ -905,7 +993,7 @@ button {
   margin-top: 3.75rem;
   padding-top: 2.4rem;
   border-top: 1px solid var(--border);
-  scroll-margin-top: 1.5rem;
+  scroll-margin-top: 6.5rem;
 }
 
 .comments.is-targeted {
@@ -1504,6 +1592,16 @@ textarea {
     font-size: 0.86rem;
   }
 
+  /* 手机上吸顶页头再压缩一档，尽量少占阅读高度。 */
+  .site-header.is-stuck {
+    padding-top: 0.65rem;
+  }
+
+  .site-header.is-stuck .nav-link {
+    padding-top: 0.42rem;
+    padding-bottom: 0.42rem;
+  }
+
   .page-head {
     padding-top: 2.2rem;
   }
@@ -1592,7 +1690,54 @@ textarea {
   color: var(--muted);
 }
 
-/* ---------- 24. 减少动态效果 / 打印 ---------- */
+/* ---------- 24. 排版精修（text-wrap / 数字对齐 / 锚点偏移） ---------- */
+
+/* 标题避免末行孤字，尽量让各行长度均衡。 */
+.masthead-title,
+.page-title,
+.post-title,
+.post-card-title,
+.section-title,
+.archive-year,
+.form-title,
+.empty-title,
+.prose h2,
+.prose h3,
+.prose h4 {
+  text-wrap: balance;
+}
+
+/* 正文与摘要按「漂亮断行」排，减少段落末行只剩一两个字的孤行。 */
+.masthead-subtitle,
+.page-sub,
+.post-lede,
+.post-card-summary,
+.author-bio,
+.footer-text,
+.prose p,
+.empty p {
+  text-wrap: pretty;
+}
+
+/* 日期、阅读数、时间等数字等宽，翻页/更新时不会左右跳动。 */
+.post-meta,
+.post-views,
+.archive-date,
+.archive-year,
+.comment-time,
+.count-badge,
+.tag-count {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 吸顶页头会盖住锚点目标，给正文标题预留约一个收缩后页头的高度。 */
+.prose h2,
+.prose h3,
+.prose h4 {
+  scroll-margin-top: 6rem;
+}
+
+/* ---------- 25. 减少动态效果 / 打印 ---------- */
 
 @media (prefers-reduced-motion: reduce) {
   html {
@@ -1606,6 +1751,18 @@ textarea {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* 吸顶页头的收紧动画在该偏好下直接关闭，状态切换瞬时完成。 */
+  .site-header,
+  .masthead-title,
+  .masthead-title::before,
+  .masthead-subtitle,
+  .header-actions,
+  .site-nav,
+  .nav-link,
+  .icon-btn {
+    transition: none !important;
   }
 }
 

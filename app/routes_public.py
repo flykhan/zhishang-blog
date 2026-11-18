@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import html
 import math
+import re
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from urllib.parse import quote
@@ -21,8 +23,8 @@ from fastapi.responses import (
 from . import auth, db, repo
 from .config import settings
 from .markdown_render import render_markdown
-from .templating import render
-from .utils import comment_email_valid, parse_iso
+from .templating import jsonld_dumps, render
+from .utils import clean_summary, comment_email_valid, parse_iso
 
 router = APIRouter()
 
@@ -57,6 +59,80 @@ def _pagination(page: int, total_pages: int, total_items: int, base_url: str) ->
 
 def _post_url(slug: str) -> str:
     return f"/post/{quote(slug)}"
+
+
+# ---------------------------------------------------------------- 分享 / SEO 辅助
+
+# Markdown 内联图片：![alt](url) 或 ![alt](<url with space> "title")
+_MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))", re.IGNORECASE)
+# 内联 HTML 图片：<img src="..."> / src='...' / src=...
+_HTML_IMAGE_RE = re.compile(
+    r"""<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>"']+))""",
+    re.IGNORECASE,
+)
+
+
+def _first_content_image(content_md: str) -> str:
+    """取正文中位置最靠前的一张图片 URL（Markdown 或内联 HTML），没有则返回空串。"""
+    if not content_md:
+        return ""
+    first = None
+    for pattern in (_MD_IMAGE_RE, _HTML_IMAGE_RE):
+        match = pattern.search(content_md)
+        if match and (first is None or match.start() < first.start()):
+            first = match
+    if first is None:
+        return ""
+    for group in first.groups():
+        if group and group.strip():
+            return html.unescape(group.strip())
+    return ""
+
+
+def _absolute_image_url(url: str) -> str:
+    """把正文图片 URL 归一为 og:image 可用的绝对地址。"""
+    default = settings.site_url_base + "/static/og-default.png"
+    if not url:
+        return default
+    if url.startswith("//"):  # 协议相对地址
+        return "https:" + url
+    scheme = re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", url)
+    if scheme:
+        # 已有协议：http(s) 原样使用；data:/其他协议不能作为分享图。
+        return url if url.lower().startswith(("http://", "https://")) else default
+    path = url[2:] if url.startswith("./") else url
+    return f"{settings.site_url_base}/{path.lstrip('/')}"
+
+
+def _jsonld_date(value) -> str:
+    dt = parse_iso(value)
+    return dt.isoformat() if dt else ""
+
+
+def _article_jsonld(post: dict, site: dict, image_url: str) -> str:
+    """生成文章页 Article JSON-LD（字符串，`</` 已转义）。"""
+    page_url = settings.site_url_base + _post_url(post["slug"])
+    published = _jsonld_date(post["published_at"] or post["created_at"])
+    modified = _jsonld_date(post["updated_at"]) or published
+    return jsonld_dumps(
+        {
+            "@context": "https://schema.org",
+            "@type": "Article",
+            "headline": post["title"],
+            "description": clean_summary(post["summary"], 200)
+            or site.get("site_description", ""),
+            "image": [image_url],
+            "datePublished": published,
+            "dateModified": modified,
+            "inLanguage": "zh-CN",
+            "author": {
+                "@type": "Person",
+                "name": site.get("author_name", ""),
+            },
+            "mainEntityOfPage": {"@type": "WebPage", "@id": page_url},
+            "url": page_url,
+        }
+    )
 
 
 # ---------------------------------------------------------------- 列表 / 详情
@@ -103,6 +179,8 @@ def post_detail(request: Request, slug: str):
     if post["status"] == "published" and user is None:
         repo.increment_views(post["id"])
     post["content_html"] = str(render_markdown(post["content_md"]))
+    site = repo.get_settings()
+    og_image = _absolute_image_url(_first_content_image(post["content_md"]))
     comments = repo.list_approved_comments(post["id"])
     return render(
         request,
@@ -114,6 +192,8 @@ def post_detail(request: Request, slug: str):
         comment_submitted=request.query_params.get("ok") == "comment"
         or request.query_params.get("comment") == "ok",
         page_title=post["title"],
+        og_image=og_image,
+        article_jsonld=_article_jsonld(post, site, og_image),
     )
 
 
@@ -241,7 +321,7 @@ def feed():
             f"<link>{xml_escape(link)}</link>"
             f'<guid isPermaLink="true">{xml_escape(link)}</guid>'
             f"<pubDate>{pub_date}</pubDate>"
-            f"<description>{xml_escape(post['summary'])}</description>"
+            f"<description>{xml_escape(clean_summary(post['summary']))}</description>"
             "</item>"
         )
 
@@ -307,4 +387,5 @@ def healthz():
 
 @router.get("/favicon.ico")
 def favicon():
-    return RedirectResponse("/static/favicon.svg", status_code=302)
+    # 本轮新增了 ICO/SVG 两套图标：浏览器直接请求 /favicon.ico 时交给静态 ICO。
+    return RedirectResponse("/static/favicon.ico", status_code=302)

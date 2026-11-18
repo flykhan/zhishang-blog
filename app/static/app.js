@@ -78,6 +78,42 @@
     }
   }
 
+  /* ---------- 吸顶页头 ---------- */
+
+  const siteHeader = document.querySelector(".site-header");
+  if (siteHeader) {
+    const STUCK_OFFSET = 120;
+    const raf =
+      typeof window.requestAnimationFrame === "function"
+        ? window.requestAnimationFrame.bind(window)
+        : function (callback) {
+            return window.setTimeout(callback, 16);
+          };
+    let stuck = null;
+    let scheduled = false;
+
+    const syncHeader = function () {
+      scheduled = false;
+      const nextStuck = (window.scrollY || window.pageYOffset || 0) > STUCK_OFFSET;
+      if (nextStuck !== stuck) {
+        stuck = nextStuck;
+        siteHeader.classList.toggle("is-stuck", stuck);
+      }
+    };
+
+    const requestHeaderSync = function () {
+      if (scheduled) {
+        return;
+      }
+      scheduled = true;
+      raf(syncHeader);
+    };
+
+    syncHeader();
+    window.addEventListener("scroll", requestHeaderSync, { passive: true });
+    window.addEventListener("resize", requestHeaderSync);
+  }
+
   /* ---------- 返回顶部 ---------- */
 
   const toTop = document.getElementById("to-top");

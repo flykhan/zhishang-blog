@@ -23,7 +23,7 @@
           </p>
           <h2 class="post-card-title"><a href="/post/{{ post.slug|urlencode }}">{{ post.title }}</a></h2>
           {% if post.summary %}
-            <p class="post-card-summary">{{ post.summary }}</p>
+            <p class="post-card-summary">{{ post.summary|clean_summary }}</p>
           {% endif %}
           {% set post_tags = post.tags|taglist %}
           <div class="post-card-foot">
