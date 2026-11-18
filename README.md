@@ -161,18 +161,19 @@ docker compose up -d --build   # 数据卷 blog-data 会保留
 镜像：`flykhan/zhishang-blog`（linux/amd64），manifest digest：
 
 ```
-sha256:7360303997d47e9753177709724eb5a4f286be5d0409bd081249c0e090c8dc48
+sha256:c57c695ed489b06f90f11d8f9af741dc4393331b9749781342536b5ed634fc77
 ```
 
 | Tag | 说明 |
 |---|---|
-| `1.1.0` | 固定版本（当前最新，含三波设计升级） |
+| `1.1.1` | 固定版本（当前最新：三波设计升级 + 后台移动端适配修复） |
+| `1.1.0` | 上一版（保留） |
 | `1.1` | 1.1.x 版本线 |
-| `1.0.0` | 上一版（保留） |
+| `1.0.0` | 更早版本（保留） |
 | `latest` | 最新构建 |
 
 ```bash
-docker pull flykhan/zhishang-blog:1.1.0
+docker pull flykhan/zhishang-blog:1.1.1
 
 # 使用仓库内 release compose（不构建，直接拉镜像）
 docker compose -f docker-compose.release.yml up -d

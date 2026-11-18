@@ -42,12 +42,12 @@
               <a href="/admin/posts/{{ p.id }}/edit">{{ p.title }}</a>
               <span class="cell-sub">/post/{{ p.slug }}</span>
             </td>
-            <td>
+            <td data-label="状态">
               <span class="status-pill status-pill--{{ p.status }}">{{ '已发布' if p.status == 'published' else '草稿' }}</span>
             </td>
-            <td class="col-hide-sm">{{ p.views }}</td>
-            <td class="col-hide-sm"><time datetime="{{ p.updated_at }}">{{ p.updated_at|date }}</time></td>
-            <td class="cell-actions">
+            <td class="col-hide-sm" data-label="浏览">{{ p.views }}</td>
+            <td class="col-hide-sm" data-label="更新时间"><time datetime="{{ p.updated_at }}">{{ p.updated_at|date }}</time></td>
+            <td class="cell-actions" data-label="操作">
               <div class="cell-actions__inner">
                 <a class="admin-btn admin-btn--ghost admin-btn--sm" href="/admin/posts/{{ p.id }}/edit">编辑</a>
                 {% if p.status == 'published' %}
