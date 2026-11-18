@@ -8,7 +8,7 @@
   <title>{% block title %}{{ site.site_title }}{% endblock %}</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="alternate" type="application/rss+xml" title="{{ site.site_title }} · RSS" href="/feed.xml">
-  <link rel="canonical" href="{{ request.url }}">
+  <link rel="canonical" href="{{ site_url }}{{ request.url.path }}">
   <script>
     (function () {
       try {

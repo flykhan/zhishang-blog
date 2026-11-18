@@ -293,11 +293,11 @@ Jinja 环境：`autoescape=True`、`trim_blocks`、`lstrip_blocks`。**未定义
 
 - **Dockerfile**：多阶段构建（builder `pip install --prefix` → runtime `python:3.12-slim`），非 root 用户运行（UID 10001，用户/组 `app`），`/data` 数据卷（SQLite 持久化），入口脚本修正 `/data` 权限后降权执行，`EXPOSE 8000`，`HEALTHCHECK` 请求 `/healthz`，`CMD uvicorn app.main:app --host 0.0.0.0 --port 8000`。镜像要求：无编译工具残留、体积尽量小、`PYTHONDONTWRITEBYTECODE=1`、`PYTHONUNBUFFERED=1`。
 - **入口脚本** `docker/entrypoint.sh`：`set -eu`；确保 `$DATA_DIR`（默认 `/data`）存在；root 时 chown 给 app 用户；用 `setpriv`/`gosu` 或 Python 降权后 `exec "$@"`；信号正常传递。
-- **docker-compose.yml**：服务 `blog`，`build: .`，端口 `${BLOG_PORT:-8080}:8000`，卷 `blog-data:/data`，`restart: unless-stopped`，healthcheck，环境变量（见 §11），可选 `env_file: .env`。**注意**：compose 文件里不要用 `${SECRET_KEY:?...}` 之类强制报错语法，缺省值要能让 `docker compose up` 直接跑通。
+- **docker-compose.yml**：服务 `blog`，`build: .`，端口默认只绑定本机 `127.0.0.1:${BLOG_PORT:-8080}:8000`，卷 `blog-data:/data`，`restart: unless-stopped`，healthcheck，环境变量（见 §11），可选 `env_file: .env`。**注意**：compose 文件里不要用 `${SECRET_KEY:?...}` 之类强制报错语法，缺省值要能让 `docker compose up` 直接跑通。
 - **.env.example**：全部环境变量 + 说明 + 生成 SECRET_KEY 的提示（`python -c "import secrets;print(secrets.token_hex(32))"`）。
 - **.dockerignore**：`.git`、`data`、`__pycache__`、`*.pyc`、`.venv`、`README.md`? 保留 README 无妨，排除开发产物与本地数据库。
 - **Makefile**：`build/up/down/logs/ps/restart/test(冒烟)/clean/shell` 目标。
-- **scripts/smoke_test.sh**：纯 curl + bash，参数 `BASE_URL`（默认 `http://localhost:8080`）与 `ADMIN_USER/ADMIN_PASS`（默认 admin/admin123），覆盖：`/healthz`、`/`、登录（cookie jar）、新建文章、文章页可见、RSS、`/admin/settings`、提交评论、后台通过评论、评论出现在文章页、删除文章。每步打印 PASS/FAIL，任一失败退出码非 0。
+- **scripts/smoke_test.sh**：纯 curl + bash，参数 `BASE_URL`（默认 `http://localhost:8080`）与 `ADMIN_USER/ADMIN_PASS`（初始密码见日志或 `/data/initial_admin_password.txt`；显式设置 `ADMIN_PASSWORD` 时以该值为准），覆盖：`/healthz`、`/`、登录（cookie jar）、新建文章、文章页可见、RSS、`/admin/settings`、提交评论、后台通过评论、评论出现在文章页、删除文章。每步打印 PASS/FAIL，任一失败退出码非 0。
 - **README.md**：项目介绍、功能、截图占位（不需要真截图）、快速开始（Docker）、本地开发、环境变量表、目录结构、数据备份、安全建议（改默认密码、设置 SECRET_KEY、反向代理 HTTPS）、常见问题。中文撰写。
 
 ### §11 环境变量（后端实现，运维使用）
@@ -307,13 +307,15 @@ Jinja 环境：`autoescape=True`、`trim_blocks`、`lstrip_blocks`。**未定义
 | `SECRET_KEY` | 自动生成并持久化到 `/data/.secret_key` | 会话签名密钥 |
 | `DB_PATH` | `./data/blog.db`（容器内 `/data/blog.db`） | SQLite 路径 |
 | `ADMIN_USERNAME` | `admin` | 首次初始化管理员 |
-| `ADMIN_PASSWORD` | `admin123` | 首次初始化密码（启动日志警告） |
+| `ADMIN_PASSWORD` | 随机生成 | 首次初始化密码；留空时随机生成并写入 `/data/initial_admin_password.txt` + 日志 |
 | `SITE_URL` | `http://localhost:8080` | RSS/sitemap 绝对链接前缀 |
 | `SITE_TZ` | `Asia/Shanghai` | 展示时区（存储始终 UTC） |
 | `BLOG_PORT` | `8080` | 宿主机端口（compose 用） |
 | `ALLOW_COMMENTS` | `true` | 初始化默认值（之后以数据库设置为准） |
 | `COOKIE_SECURE` | `false` | HTTPS 部署设为 true |
 | `SESSION_MAX_AGE` | `604800`（7 天） | 会话有效期（秒） |
+| `TRUST_PROXY` | `false` | 反向代理后从 X-Forwarded-For 取真实 IP（限流用） |
+| `MAX_BODY_BYTES` | `1048576` | 单次请求体上限（字节） |
 
 ## 12. 质量门槛与自检
 

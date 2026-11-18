@@ -23,6 +23,14 @@ POST_STATUSES = ("draft", "published")
 COMMENT_STATUSES = ("pending", "approved")
 
 
+_MAX_SQLITE_INT = 9223372036854775807
+
+
+def valid_id(value) -> bool:
+    """SQLite INTEGER 主键范围校验，避免超大整数触发 OverflowError。"""
+    return isinstance(value, int) and 0 < value <= _MAX_SQLITE_INT
+
+
 def _post_dict(row: sqlite3.Row) -> dict:
     post = dict(row)
     post["reading_time"] = reading_time(post.get("content_md") or "")
@@ -111,6 +119,17 @@ def list_posts_by_tag(tag: str, limit: int, offset: int = 0) -> list[dict]:
             (pattern, limit, offset),
         ).fetchall()
     return [_post_dict(row) for row in rows]
+
+
+def count_search_posts(query: str) -> int:
+    pattern = f"%{_escape_like(query)}%"
+    with db.get_conn() as con:
+        return con.execute(
+            "SELECT COUNT(*) AS c FROM posts WHERE status = 'published' AND ("
+            "title LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' "
+            "OR content_md LIKE ? ESCAPE '\\')",
+            (pattern, pattern, pattern),
+        ).fetchone()["c"]
 
 
 def search_posts(query: str, limit: int = 50) -> list[dict]:
@@ -444,9 +463,17 @@ def get_user_by_id(user_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def update_user_password(user_id: int, password_hash: str) -> bool:
+def update_user_password(user_id: int, password_hash: str) -> int | None:
+    """更新密码，清除首次改密标记并递增会话版本（使旧会话立即失效）。"""
     with db.get_conn() as con:
         cur = con.execute(
-            "UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id)
+            "UPDATE users SET password_hash = ?, must_change_password = 0, "
+            "session_version = session_version + 1 WHERE id = ?",
+            (password_hash, user_id),
         )
-        return cur.rowcount > 0
+        if cur.rowcount == 0:
+            return None
+        row = con.execute(
+            "SELECT session_version FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        return int(row["session_version"]) if row else None

@@ -38,7 +38,15 @@ def _csrf_ok(request: Request, form) -> bool:
     provided = str(form.get("csrf_token") or "")
     if not expected or not provided:
         return False
-    return hmac.compare_digest(provided, expected)
+    return hmac.compare_digest(
+        provided.encode("utf-8", "backslashreplace"),
+        expected.encode("utf-8", "backslashreplace"),
+    )
+
+
+def _ensure_valid_id(value: int) -> None:
+    if not repo.valid_id(value):
+        raise HTTPException(status_code=404)
 
 
 def _field(form, name: str, limit: int = 10000) -> str:
@@ -106,12 +114,19 @@ async def login_submit(request: Request):
     provided = str(form.get("csrf_token") or "")
     cookie_token = request.cookies.get(auth.LOGIN_CSRF_COOKIE) or ""
 
-    if not cookie_token or not provided or not hmac.compare_digest(provided, cookie_token):
+    if (
+        not cookie_token
+        or not provided
+        or not hmac.compare_digest(
+            provided.encode("utf-8", "backslashreplace"),
+            cookie_token.encode("utf-8", "backslashreplace"),
+        )
+    ):
         return PlainTextResponse("表单已过期，请刷新页面后重试。", status_code=400)
 
-    ip = request.client.host if request.client else "unknown"
+    ip = auth.client_ip(request)
     if not auth.login_allowed(ip):
-        return render_admin(
+        response = render_admin(
             request,
             "admin/login.html",
             csrf=cookie_token,
@@ -120,6 +135,8 @@ async def login_submit(request: Request):
             page_title="登录",
             status_code=429,
         )
+        response.headers["Retry-After"] = "600"
+        return response
 
     user = repo.get_user_by_username(username)
     if user is None or not auth.verify_password(password, user["password_hash"]):
@@ -135,7 +152,9 @@ async def login_submit(request: Request):
         )
 
     auth.clear_login_failures(ip)
-    token = auth.create_session(user["id"], user["username"])
+    token = auth.create_session(
+        user["id"], user["username"], int(user.get("session_version") or 0)
+    )
     response = RedirectResponse("/admin?ok=login", status_code=303)
     auth.set_session_cookie(response, token)
     response.delete_cookie(auth.LOGIN_CSRF_COOKIE, path="/admin")
@@ -221,6 +240,7 @@ def new_post_page(request: Request):
 def edit_post_page(request: Request, post_id: int):
     if not _current_user(request):
         return _login_redirect()
+    _ensure_valid_id(post_id)
     post = repo.get_post_by_id(post_id)
     if post is None:
         raise HTTPException(status_code=404)
@@ -307,7 +327,9 @@ async def delete_post(request: Request, post_id: int):
     form = await request.form()
     if not _csrf_ok(request, form):
         return PlainTextResponse("CSRF 校验失败", status_code=400)
-    repo.delete_post(post_id)
+    _ensure_valid_id(post_id)
+    if not repo.delete_post(post_id):
+        raise HTTPException(status_code=404)
     return RedirectResponse("/admin/posts?ok=deleted", status_code=303)
 
 
@@ -318,6 +340,7 @@ async def toggle_post(request: Request, post_id: int):
     form = await request.form()
     if not _csrf_ok(request, form):
         return PlainTextResponse("CSRF 校验失败", status_code=400)
+    _ensure_valid_id(post_id)
     new_status = repo.toggle_post_status(post_id)
     if new_status is None:
         raise HTTPException(status_code=404)
@@ -363,7 +386,9 @@ async def approve_comment(request: Request, comment_id: int):
     form = await request.form()
     if not _csrf_ok(request, form):
         return PlainTextResponse("CSRF 校验失败", status_code=400)
-    repo.set_comment_status(comment_id, "approved")
+    _ensure_valid_id(comment_id)
+    if not repo.set_comment_status(comment_id, "approved"):
+        raise HTTPException(status_code=404)
     return RedirectResponse("/admin/comments?status=pending&ok=approved", status_code=303)
 
 
@@ -374,7 +399,9 @@ async def delete_comment(request: Request, comment_id: int):
     form = await request.form()
     if not _csrf_ok(request, form):
         return PlainTextResponse("CSRF 校验失败", status_code=400)
-    repo.delete_comment(comment_id)
+    _ensure_valid_id(comment_id)
+    if not repo.delete_comment(comment_id):
+        raise HTTPException(status_code=404)
     return RedirectResponse("/admin/comments?status=all&ok=comment_deleted", status_code=303)
 
 
@@ -461,8 +488,16 @@ async def change_password(request: Request):
             status_code=400,
         )
 
-    repo.update_user_password(int(user["id"]), auth.hash_password(new_password))
-    return RedirectResponse("/admin/settings?ok=password_changed", status_code=303)
+    new_version = repo.update_user_password(
+        int(user["id"]), auth.hash_password(new_password)
+    )
+    response = RedirectResponse("/admin/settings?ok=password_changed", status_code=303)
+    if new_version is not None:
+        token = auth.create_session(
+            int(user["id"]), str(user["username"]), new_version
+        )
+        auth.set_session_cookie(response, token)
+    return response
 
 
 # ---------------------------------------------------------------- Markdown 预览

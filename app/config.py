@@ -69,6 +69,8 @@ class Settings:
     cookie_secure: bool
     session_max_age: int
     port: int
+    trust_proxy: bool
+    max_body_bytes: int
 
     @property
     def timezone(self) -> ZoneInfo:
@@ -88,11 +90,13 @@ settings = Settings(
     db_path=_DB_PATH,
     secret_key=resolve_secret_key(_DB_PATH),
     admin_username=os.environ.get("ADMIN_USERNAME", "admin").strip() or "admin",
-    admin_password=os.environ.get("ADMIN_PASSWORD", "admin123"),
+    admin_password=os.environ.get("ADMIN_PASSWORD", "").strip(),
     site_url=os.environ.get("SITE_URL", DEFAULT_SITE_URL),
     site_tz=os.environ.get("SITE_TZ", "Asia/Shanghai"),
     allow_comments=_env_bool("ALLOW_COMMENTS", True),
     cookie_secure=_env_bool("COOKIE_SECURE", False),
     session_max_age=_env_int("SESSION_MAX_AGE", 604800),
     port=_env_int("PORT", 8000),
+    trust_proxy=_env_bool("TRUST_PROXY", False),
+    max_body_bytes=_env_int("MAX_BODY_BYTES", 1_048_576),
 )

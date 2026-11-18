@@ -83,7 +83,14 @@ docker compose up -d --build
 | 前台首页 | http://localhost:8080 |
 | 后台登录 | http://localhost:8080/admin/login |
 
-> **默认管理员账号：`admin` / `admin123`**，仅用于首次初始化，登录后请立即在「后台 → 设置 → 修改密码」中修改。
+> 容器端口默认只绑定 `127.0.0.1`，公网访问请按[安全建议](#安全建议)用 Nginx / Caddy 反向代理并启用 HTTPS。
+
+> **首次启动管理员**：默认用户名 `admin`；若未设置 `ADMIN_PASSWORD`，系统会**生成随机初始密码**：
+> - 启动日志：`docker compose logs blog | grep 初始密码`
+> - 或容器内文件：`docker compose exec blog cat /data/initial_admin_password.txt`
+>
+> 登录后请立即在「后台 → 设置」修改密码（后台也会显示醒目提醒）。
+> 想固定初始密码，可在 `.env` 中设置 `ADMIN_PASSWORD=你的强密码` 后首次启动。
 > 若未设置 `SECRET_KEY`，后端会自动生成并保存到 `/data/.secret_key`，重启后会话不会失效。
 
 ### 检查状态
@@ -142,7 +149,9 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 | `SECRET_KEY` | 自动生成并持久化到 `/data/.secret_key` | 会话签名密钥。生产环境建议显式设置随机值，更换后所有登录会话失效 |
 | `DB_PATH` | `./data/blog.db`（容器内 `/data/blog.db`） | SQLite 数据库路径；compose 中固定为 `/data/blog.db` |
 | `ADMIN_USERNAME` | `admin` | 首次初始化管理员用户名（仅数据库为空时生效） |
-| `ADMIN_PASSWORD` | `admin123` | 首次初始化管理员密码（启动日志会给出警告） |
+| `ADMIN_PASSWORD` | 随机生成 | 首次初始化管理员密码；留空时随机生成并写入 `/data/initial_admin_password.txt`、打印到启动日志 |
+| `TRUST_PROXY` | `false` | 反向代理后设为 `true`，从 `X-Forwarded-For` 取真实客户端 IP（限流用）；直连时保持 `false` 防伪造 |
+| `MAX_BODY_BYTES` | `1048576` | 单次请求体大小上限（字节），超限返回 413 |
 | `SITE_URL` | `http://localhost:8080` | RSS / sitemap 绝对链接前缀，部署公网时改成真实域名 |
 | `SITE_TZ` | `Asia/Shanghai` | 展示时区（数据库始终以 UTC 存储） |
 | `BLOG_PORT` | `8080` | 宿主机映射端口（容器内固定 8000） |
@@ -210,7 +219,8 @@ myblog/
 ```text
 /data/
 ├── blog.db          # SQLite 数据库（文章、评论、设置、用户）
-└── .secret_key      # 未显式设置 SECRET_KEY 时自动生成
+├── .secret_key      # 未显式设置 SECRET_KEY 时自动生成
+└── initial_admin_password.txt  # 未设置 ADMIN_PASSWORD 时生成的随机初始密码
 ```
 
 ---
@@ -281,7 +291,7 @@ docker compose up -d
 
 ## 安全建议
 
-1. **立即修改默认密码**：首次登录后进入「后台 → 设置 → 修改密码」，不要长期使用 `admin123`。
+1. **立即修改初始密码**：登录后进入「后台 → 设置 → 修改密码」。未设置 `ADMIN_PASSWORD` 时密码是随机生成的，但仍建议改成只有你知道的强密码。
 2. **显式设置 `SECRET_KEY`**：在 `.env` 中使用随机值（`python -c "import secrets; print(secrets.token_hex(32))"`），并妥善保管 `.env`。
 3. **生产环境务必启用 HTTPS**：通过 Nginx / Caddy 等反向代理终止 TLS，并设置 `COOKIE_SECURE=true`、`SITE_URL=https://你的域名`。
 4. **不要直接暴露后台端口到公网**：仅将 8080 映射到本机（如 `127.0.0.1:8080:8000`），由反向代理对外提供服务；或使用防火墙 / 内网访问。
@@ -328,6 +338,8 @@ server {
 ```dotenv
 SITE_URL=https://blog.example.com
 COOKIE_SECURE=true
+# 反向代理后启用，限流才能拿到真实客户端 IP
+TRUST_PROXY=true
 # 公网部署时建议改成只绑定本机，由反向代理访问
 # BLOG_PORT=8080（配合 compose 端口改为 127.0.0.1:8080:8000）
 ```
@@ -367,10 +379,8 @@ docker compose down
 `scripts/smoke_test.sh` 使用纯 bash + curl（不需要 jq / Python），对运行中的实例执行端到端验证：
 
 ```bash
-# 默认：http://localhost:8080，管理员 admin/admin123
-./scripts/smoke_test.sh
-
-# 自定义地址与账号（环境变量或位置参数均可）
+# 密码默认值仅适用于显式设置了 ADMIN_PASSWORD=admin123 的实例；
+# 随机初始密码请从日志或 /data/initial_admin_password.txt 获取后传入。
 BASE_URL=http://localhost:8080 ADMIN_USER=admin ADMIN_PASS=你的密码 ./scripts/smoke_test.sh
 ./scripts/smoke_test.sh http://localhost:8080 admin 你的密码
 ```

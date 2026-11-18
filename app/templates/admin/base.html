@@ -94,6 +94,13 @@
       </div>
       {% endif %}
 
+      {% if user and user.must_change_password %}
+      <div class="admin-alert admin-alert--err" role="alert">
+        你仍在使用初始化密码，后台随时可能被他人接管。请立即前往
+        <a href="/admin/settings">设置</a> 修改密码。
+      </div>
+      {% endif %}
+
       {% block content %}{% endblock %}
     </div>
   </main>

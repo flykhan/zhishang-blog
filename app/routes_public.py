@@ -18,7 +18,7 @@ from fastapi.responses import (
     Response,
 )
 
-from . import auth, repo
+from . import auth, db, repo
 from .config import settings
 from .markdown_render import render_markdown
 from .templating import render
@@ -76,7 +76,11 @@ def _index_page(request: Request, page: int):
     per_page = _per_page()
     total = repo.count_published()
     total_pages = max(1, math.ceil(total / per_page))
-    page = min(max(1, page), total_pages)
+    clamped = min(max(1, page), total_pages)
+    if clamped != page or (page == 1 and request.url.path != "/"):
+        target = "/" if clamped == 1 else f"/page/{clamped}"
+        return RedirectResponse(target, status_code=301)
+    page = clamped
     posts = repo.list_published(per_page, (page - 1) * per_page)
     page_title = "首页" if page == 1 else f"第 {page} 页"
     return render(
@@ -107,7 +111,8 @@ def post_detail(request: Request, slug: str):
         comments=comments,
         comment_count=len(comments),
         comments_open=repo.get_setting("allow_comments", "1") == "1",
-        comment_submitted=request.query_params.get("comment") == "ok",
+        comment_submitted=request.query_params.get("ok") == "comment"
+        or request.query_params.get("comment") == "ok",
         page_title=post["title"],
     )
 
@@ -140,7 +145,7 @@ async def submit_comment(request: Request, slug: str):
     if not valid:
         return RedirectResponse(f"{back}?err=comment_invalid#comments", status_code=303)
 
-    ip = request.client.host if request.client else "unknown"
+    ip = auth.client_ip(request)
     if not auth.comment_allowed(ip):
         return RedirectResponse(f"{back}?err=rate_limited#comments", status_code=303)
     auth.record_comment(ip)
@@ -172,7 +177,15 @@ def _tag_page(request: Request, tag: str, page: int):
     per_page = _per_page()
     total = repo.count_posts_by_tag(tag)
     total_pages = max(1, math.ceil(total / per_page))
-    page = min(max(1, page), total_pages)
+    clamped = min(max(1, page), total_pages)
+    if clamped != page or request.url.path.endswith("/page/1"):
+        target = (
+            f"/tag/{quote(tag)}"
+            if clamped == 1
+            else f"/tag/{quote(tag)}/page/{clamped}"
+        )
+        return RedirectResponse(target, status_code=301)
+    page = clamped
     posts = repo.list_posts_by_tag(tag, per_page, (page - 1) * per_page)
     return render(
         request,
@@ -193,7 +206,7 @@ def search(request: Request):
         "search.html",
         query=query,
         posts=posts,
-        total=len(posts),
+        total=repo.count_search_posts(query) if query else 0,
         page_title=f"搜索：{query}" if query else "搜索",
     )
 
@@ -254,7 +267,11 @@ def sitemap():
         urls.append(f"<url><loc>{xml_escape(base + path)}</loc></url>")
     for post in repo.list_published(500, 0):
         dt = parse_iso(post["updated_at"]) or parse_iso(post["created_at"])
-        lastmod = f"<lastmod>{dt.strftime('%Y-%m-%d')}</lastmod>" if dt else ""
+        lastmod = (
+            f"<lastmod>{dt.astimezone(settings.timezone).strftime('%Y-%m-%d')}</lastmod>"
+            if dt
+            else ""
+        )
         urls.append(
             f"<url><loc>{xml_escape(base + _post_url(post['slug']))}</loc>{lastmod}</url>"
         )
@@ -280,6 +297,11 @@ def robots():
 
 @router.get("/healthz")
 def healthz():
+    try:
+        with db.get_conn() as con:
+            con.execute("SELECT 1").fetchone()
+    except Exception:  # pragma: no cover - 仅在数据库异常时触发
+        return JSONResponse({"status": "error"}, status_code=503)
     return JSONResponse({"status": "ok", "service": "paper-blog"})
 
 

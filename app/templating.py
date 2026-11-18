@@ -52,6 +52,7 @@ def base_context(request: Request) -> dict:
             request.query_params.get("ok"), request.query_params.get("err")
         ),
         "now_year": datetime.now(settings.timezone).year,
+        "site_url": settings.site_url_base,
     }
 
 

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import logging
+import os
+import pathlib
+import secrets
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -18,6 +21,8 @@ CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
+    session_version INTEGER NOT NULL DEFAULT 0,
+    must_change_password INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL
 );
 
@@ -119,12 +124,13 @@ WELCOME_SUMMARY = (
 @contextmanager
 def get_conn():
     """每次请求一个短连接；WAL 模式下并发读写足够用。"""
-    Path(settings.db_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(settings.db_path, timeout=15)
+    db_file = Path(settings.db_path).expanduser()
+    db_file.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(str(db_file), timeout=15)
     con.row_factory = sqlite3.Row
     try:
         con.execute("PRAGMA foreign_keys = ON")
-        con.execute("PRAGMA busy_timeout = 5000")
+        con.execute("PRAGMA busy_timeout = 15000")
         yield con
         con.commit()
     except Exception:
@@ -136,8 +142,9 @@ def get_conn():
 
 def connect() -> sqlite3.Connection:
     """给需要手动管理生命周期的地方使用（例如后台脚本）。"""
-    Path(settings.db_path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(settings.db_path, timeout=15)
+    db_file = Path(settings.db_path).expanduser()
+    db_file.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(str(db_file), timeout=15)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
     con.execute("PRAGMA journal_mode = WAL")
@@ -150,7 +157,21 @@ def init_db() -> None:
     with get_conn() as con:
         con.execute("PRAGMA journal_mode = WAL")
         con.executescript(SCHEMA)
+        _migrate(con)
         _seed(con)
+
+
+def _migrate(con: sqlite3.Connection) -> None:
+    """轻量迁移：为旧数据库补齐新增列。"""
+    columns = {row["name"] for row in con.execute("PRAGMA table_info(users)").fetchall()}
+    if "session_version" not in columns:
+        con.execute(
+            "ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 0"
+        )
+    if "must_change_password" not in columns:
+        con.execute(
+            "ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0"
+        )
 
 
 def _seed(con: sqlite3.Connection) -> None:
@@ -160,11 +181,31 @@ def _seed(con: sqlite3.Connection) -> None:
         )
 
     if con.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"] == 0:
+        password = settings.admin_password
+        generated = False
+        if not password:
+            # 安全默认：未配置 ADMIN_PASSWORD 时生成随机初始口令，并写入数据目录供查看。
+            password = secrets.token_urlsafe(12)
+            generated = True
         con.execute(
-            "INSERT INTO users(username, password_hash, created_at) VALUES(?, ?, ?)",
-            (settings.admin_username, hash_password(settings.admin_password), utc_now_iso()),
+            "INSERT INTO users(username, password_hash, must_change_password, created_at)"
+            " VALUES(?, ?, 1, ?)",
+            (settings.admin_username, hash_password(password), utc_now_iso()),
         )
         logger.info("已创建管理员账号：%s", settings.admin_username)
+        if generated:
+            logger.warning(
+                "未设置 ADMIN_PASSWORD，已生成随机初始密码：%s（请登录后立即修改）", password
+            )
+            try:
+                password_file = (
+                    pathlib.Path(settings.db_path).expanduser().parent
+                    / "initial_admin_password.txt"
+                )
+                password_file.write_text(password + "\n", encoding="utf-8")
+                os.chmod(password_file, 0o600)
+            except OSError:
+                pass
 
     if con.execute("SELECT COUNT(*) AS c FROM posts").fetchone()["c"] == 0:
         now = utc_now_iso()

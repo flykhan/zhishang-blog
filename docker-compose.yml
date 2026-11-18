@@ -15,9 +15,10 @@ services:
       context: .
       dockerfile: Dockerfile
     image: zhishang-blog:latest
-    # 服务名 blog，容器内固定监听 8000
+    container_name: zhishang-blog
+    # 服务名 blog，容器内固定监听 8000；默认只绑定本机，公网访问走反向代理
     ports:
-      - "${BLOG_PORT:-8080}:8000"
+      - "127.0.0.1:${BLOG_PORT:-8080}:8000"
     volumes:
       # SQLite 数据库、SECRET_KEY 等持久化数据都在 /data
       - blog-data:/data
@@ -36,11 +37,16 @@ services:
       SITE_TZ: "${SITE_TZ:-Asia/Shanghai}"
       # 首次初始化管理员（仅在数据库为空时生效）
       ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
-      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin123}"
+      # 未设置时由应用生成随机初始密码，写入 /data/initial_admin_password.txt 并打印到日志
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
       # 评论开关（仅初始化默认值，之后以数据库设置为准）
       ALLOW_COMMENTS: "${ALLOW_COMMENTS:-true}"
       # HTTPS 部署时设为 true
       COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      # 反向代理后启用，从 X-Forwarded-For 获取真实客户端 IP（登录/评论限流用）
+      TRUST_PROXY: "${TRUST_PROXY:-false}"
+      # 单次请求体上限（字节），默认 1 MiB
+      MAX_BODY_BYTES: "${MAX_BODY_BYTES:-1048576}"
       # 会话有效期（秒）
       SESSION_MAX_AGE: "${SESSION_MAX_AGE:-604800}"
       # SECRET_KEY 无缺省值：不在此设置，由 .env（env_file）注入；
@@ -56,4 +62,5 @@ services:
 
 volumes:
   blog-data:
-    name: blog-data
+    # 数据卷名称可通过 DATA_VOLUME 覆盖，便于同机多实例或迁移
+    name: ${DATA_VOLUME:-blog-data}

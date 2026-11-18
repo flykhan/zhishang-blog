@@ -69,11 +69,12 @@ def _sign(raw: bytes) -> str:
     return hmac.new(settings.secret_key.encode("utf-8"), raw, hashlib.sha256).hexdigest()
 
 
-def create_session(user_id: int, username: str) -> str:
+def create_session(user_id: int, username: str, session_version: int = 0) -> str:
     now = int(time.time())
     payload = {
         "uid": user_id,
         "u": username,
+        "sv": int(session_version),
         "csrf": secrets.token_urlsafe(24),
         "iat": now,
         "exp": now + settings.session_max_age,
@@ -91,7 +92,13 @@ def load_session(request: Request) -> dict | None:
         raw = _b64decode(payload_b64)
     except (ValueError, TypeError):
         return None
-    if not hmac.compare_digest(signature, _sign(raw)):
+    try:
+        valid_signature = hmac.compare_digest(
+            signature.encode("utf-8", "surrogatepass"), _sign(raw).encode("ascii")
+        )
+    except (UnicodeError, TypeError):
+        return None
+    if not valid_signature:
         return None
     try:
         data = json.loads(raw)
@@ -122,6 +129,17 @@ def clear_session_cookie(response: Response) -> None:
 
 def new_login_csrf() -> str:
     return secrets.token_urlsafe(24)
+
+
+def client_ip(request: Request) -> str:
+    """取客户端 IP；仅在显式信任反向代理时使用 X-Forwarded-For。"""
+    if settings.trust_proxy:
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            candidate = forwarded.split(",")[0].strip()
+            if candidate:
+                return candidate
+    return request.client.host if request.client else "unknown"
 
 
 # ---------------------------------------------------------------- 限流
