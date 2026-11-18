@@ -559,4 +559,6 @@ docker compose up -d --build
 
 ## 许可
 
-本项目为自托管个人使用而编写，可自由修改与部署。第三方依赖遵循各自许可证。
+- **程序代码**：以 [MIT License](LICENSE) 开源。可自由使用、修改、分发、商用，保留版权与许可声明即可；Docker 镜像也已在 OCI 元数据中声明 `licenses=MIT`。
+- **站点内容**（数据库/`/data` 中的文章、上传图片、站点文案等）：版权归作者所有，默认保留所有权利；未经作者许可请勿转载。如果你希望文章也采用开放许可，可自行改为 CC BY / CC BY-NC-SA 等。
+- **第三方依赖**（FastAPI、Jinja2、python-markdown、PyYAML 等）：遵循各自的开源许可证。
