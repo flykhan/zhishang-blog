@@ -16,4 +16,5 @@ def render_markdown(text: str) -> Markup:
     if not text:
         return Markup("")
     converter = markdown.Markdown(extensions=EXTENSIONS, output_format="html5")
-    return Markup(converter.convert(text))
+    # 文章内容仅来自受信任的管理员（见模块 docstring），此处 Markup 为有意为之。
+    return Markup(converter.convert(text))  # nosec B704

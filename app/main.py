@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -29,7 +29,8 @@ BASE_DIR = Path(__file__).resolve().parent
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
-    if settings.admin_password == "admin123":
+    # 默认占位密码只用于启动告警提示，不是真实凭据。
+    if settings.admin_password == "admin123":  # nosec B105
         logger.warning(
             "当前管理员仍是默认密码 admin123，请登录后立刻在「设置」中修改。"
         )

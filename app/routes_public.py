@@ -6,7 +6,8 @@ import math
 from datetime import datetime, timezone
 from email.utils import format_datetime
 from urllib.parse import quote
-from xml.sax.saxutils import escape as xml_escape
+# 仅用于输出转义（不是解析），不存在 XXE 风险。
+from xml.sax.saxutils import escape as xml_escape  # nosec B406
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import (
