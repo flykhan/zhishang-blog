@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}{{ post.title }} · {{ site.site_title }}{% endblock %}
+{% block meta_description %}{{ post.summary or site.site_description }}{% endblock %}
+{% block body_class %}is-post{% endblock %}
+
+{% block content %}
+  <article class="post">
+    <header class="post-header">
+      {% set post_tags = post.tags|taglist %}
+      {% if post_tags %}
+        <ul class="tag-list" aria-label="文章标签">
+          {% for tag in post_tags %}
+            <li><a class="tag" href="/tag/{{ tag|urlencode }}">{{ tag }}</a></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      <h1 class="post-title">{{ post.title }}</h1>
+      {% if post.summary %}
+        <p class="post-lede">{{ post.summary }}</p>
+      {% endif %}
+      <p class="post-meta">
+        <time datetime="{{ post.published_at }}">{{ post.published_at|date }}</time>
+        <span class="meta-sep" aria-hidden="true">·</span>
+        <span>约 {{ post.reading_time }} 分钟</span>
+        <span class="meta-sep" aria-hidden="true">·</span>
+        <span>{{ post.views }} 次阅读</span>
+      </p>
+    </header>
+
+    <div class="prose">
+      {{ post.content_html|safe }}
+    </div>
+
+    <footer class="post-footer">
+      <p class="post-end" aria-hidden="true">· 完 ·</p>
+      {% if post_tags %}
+        <ul class="tag-list" aria-label="文章标签">
+          {% for tag in post_tags %}
+            <li><a class="tag" href="/tag/{{ tag|urlencode }}">{{ tag }}</a></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </footer>
+  </article>
+
+  <section class="comments" id="comments" aria-labelledby="comments-title">
+    <h2 class="section-title" id="comments-title">
+      评论
+      <span class="count-badge">{{ comment_count }} 条</span>
+    </h2>
+
+    {% if comment_submitted %}
+      <p class="notice" role="status">评论已提交，审核通过后会显示在这里。谢谢你的留言。</p>
+    {% endif %}
+
+    {% if comments %}
+      <ol class="comment-list">
+        {% for comment in comments %}
+          <li class="comment" id="comment-{{ comment.id }}">
+            <p class="comment-meta">
+              <span class="comment-author">{{ comment.author }}</span>
+              <time class="comment-time" datetime="{{ comment.created_at }}">{{ comment.created_at|date }}</time>
+            </p>
+            <div class="comment-body">{{ comment.content }}</div>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p class="empty-inline">还没有评论，来说点什么吧。</p>
+    {% endif %}
+
+    {% if comments_open %}
+      <form class="comment-form" action="/post/{{ post.slug|urlencode }}/comment" method="post">
+        <h3 class="form-title">留下评论</h3>
+        <p class="form-hint">邮箱不会公开；评论会在审核后显示。请友善交流。</p>
+        <div class="form-grid">
+          <div class="field">
+            <label for="comment-author">昵称 <span class="required-mark" aria-hidden="true">*</span></label>
+            <input type="text" id="comment-author" name="author" required maxlength="60" autocomplete="nickname">
+          </div>
+          <div class="field">
+            <label for="comment-email">邮箱（选填）</label>
+            <input type="email" id="comment-email" name="email" maxlength="120" autocomplete="email">
+          </div>
+          <div class="field field-full">
+            <label for="comment-content">评论内容 <span class="required-mark" aria-hidden="true">*</span></label>
+            <textarea id="comment-content" name="content" rows="5" required minlength="2" maxlength="2000" placeholder="写下你的想法……"></textarea>
+          </div>
+        </div>
+        <div class="honeypot" aria-hidden="true">
+          <label for="comment-website">网站（请勿填写）</label>
+          <input type="text" id="comment-website" name="website" tabindex="-1" autocomplete="off">
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">提交评论</button>
+        </div>
+      </form>
+    {% else %}
+      <p class="comments-closed">评论已关闭，感谢阅读。</p>
+    {% endif %}
+  </section>
+
+  <p class="back-home"><a href="/">← 返回首页</a></p>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="admin-page-head">
+  <div>
+    <h1 class="admin-page-title">{% if post %}编辑文章{% else %}写文章{% endif %}</h1>
+    <p class="admin-page-sub">{% if post %}正在编辑「{{ post.title }}」{% else %}记录新的想法，写完可以存为草稿或直接发布。{% endif %}</p>
+  </div>
+  <div class="admin-page-actions">
+    {% if post and post.status == 'published' %}
+    <a class="admin-btn admin-btn--ghost" href="/post/{{ post.slug }}" target="_blank" rel="noopener">查看文章 ↗</a>
+    {% endif %}
+    <a class="admin-btn admin-btn--ghost" href="/admin/posts">返回列表</a>
+  </div>
+</div>
+
+{% if error %}
+<div class="admin-alert admin-alert--err" role="alert">{{ error }}</div>
+{% endif %}
+
+<form class="editor-form" id="post-form" action="/admin/posts/save" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <input type="hidden" name="id" value="{% if post %}{{ post.id }}{% endif %}">
+
+  <div class="editor-layout">
+    <div class="editor-fields">
+      <section class="admin-card">
+        <div class="admin-card__head">
+          <h2 class="admin-card__title">基本信息</h2>
+          <span class="admin-card__hint">标题与元信息</span>
+        </div>
+        <div class="admin-card__body">
+          <div class="form-grid">
+            <div class="field field--full">
+              <label class="field__label" for="post-title">标题</label>
+              <input class="input input--title" id="post-title" name="title" type="text" required
+                     maxlength="200" autocomplete="off" placeholder="给文章起个标题"
+                     value="{% if post %}{{ post.title }}{% endif %}">
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="post-slug">Slug（URL 路径）</label>
+              <input class="input" id="post-slug" name="slug" type="text" maxlength="120"
+                     autocomplete="off" spellcheck="false" placeholder="留空自动生成"
+                     value="{% if post %}{{ post.slug }}{% endif %}">
+              <p class="field__hint">留空将根据标题自动生成，例如 <code>/post/hello-world</code>。</p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="post-status">状态</label>
+              <select class="input" id="post-status" name="status">
+                <option value="draft"{% if not post or post.status != 'published' %} selected{% endif %}>草稿（仅自己可见）</option>
+                <option value="published"{% if post and post.status == 'published' %} selected{% endif %}>已发布（公开可见）</option>
+              </select>
+              <p class="field__hint">保存时按此状态发布或转为草稿。</p>
+            </div>
+
+            <div class="field field--full">
+              <label class="field__label" for="post-tags">标签</label>
+              <input class="input" id="post-tags" name="tags" type="text" maxlength="200"
+                     autocomplete="off" placeholder="用逗号分隔，例如：技术,FastAPI,随笔"
+                     value="{% if post %}{{ post.tags }}{% endif %}">
+              <p class="field__hint">用英文或中文逗号分隔，保存时会自动去重。</p>
+            </div>
+
+            <div class="field field--full">
+              <label class="field__label" for="post-summary">摘要</label>
+              <textarea class="input" id="post-summary" name="summary" rows="2" maxlength="500"
+                        placeholder="留空时自动截取正文开头">{{ post.summary if post else '' }}</textarea>
+              <p class="field__hint">用于首页列表与搜索引擎描述，留空将自动生成。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-card editor-content-card">
+        <div class="admin-card__head">
+          <h2 class="admin-card__title">正文</h2>
+          <span class="field__hint field__hint--inline" data-word-count>0 字</span>
+        </div>
+        <div class="admin-card__body">
+          <div class="field field--full">
+            <label class="field__label" for="content-md">Markdown</label>
+            <textarea class="input input--mono editor-textarea" id="content-md" name="content_md" rows="20"
+                      spellcheck="false" placeholder="# 标题&#10;&#10;从这里开始写作……">{{ post.content_md if post else '' }}</textarea>
+            <p class="field__hint">支持常用 Markdown 语法；<kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>S</kbd> 快速保存。</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="editor-preview" aria-label="文章实时预览">
+      <section class="admin-card editor-preview__card">
+        <div class="admin-card__head editor-preview__head">
+          <h2 class="admin-card__title">预览</h2>
+          <span class="editor-preview__state" id="preview-state">实时更新</span>
+        </div>
+        <div class="editor-preview__error" id="preview-error" role="alert" hidden></div>
+        <div class="editor-preview__body preview-prose" id="preview">
+          {% if post and post.content_md %}{{ post.content_md|md }}{% else %}<p class="editor-preview__empty">开始输入 Markdown，这里会实时渲染预览。</p>{% endif %}
+        </div>
+      </section>
+    </aside>
+  </div>
+</form>
+
+<div class="editor-actionbar">
+  <div class="editor-actionbar__info">
+    <span data-word-count>0 字</span>
+    <span class="editor-actionbar__sep" aria-hidden="true">·</span>
+    <span>{% if post and post.status == 'published' %}已发布{% elif post %}草稿{% else %}新文章{% endif %}</span>
+  </div>
+  <div class="editor-actionbar__actions">
+    {% if post %}
+    <form class="inline-form" action="/admin/posts/{{ post.id }}/delete" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <button type="submit" class="admin-btn admin-btn--danger admin-btn--sm"
+              data-confirm="确定删除文章「{{ post.title }}」？删除后不可恢复，文章下的评论也会一并删除。">删除文章</button>
+    </form>
+    {% endif %}
+    <a class="admin-btn admin-btn--ghost admin-btn--sm" href="/admin/posts">取消</a>
+    <button type="submit" class="admin-btn" id="editor-save" form="post-form">保存文章</button>
+  </div>
+</div>
+{% endblock %}

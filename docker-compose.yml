@@ -1,0 +1,59 @@
+# 「纸上」博客系统 — Docker Compose 部署配置
+#
+# 使用：
+#   cp .env.example .env      # 按需修改（可选，不做也能直接启动）
+#   docker compose up -d --build
+#   访问 http://localhost:${BLOG_PORT:-8080}
+#
+# 说明：
+# - 所有变量都有缺省值，缺少 .env 也能直接 up，不使用 ${VAR:?} 强制报错语法；
+# - .env 由 compose 自动加载用于变量插值；同时可选作为 env_file 注入容器（文件不存在不报错）。
+
+services:
+  blog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zhishang-blog:latest
+    # 服务名 blog，容器内固定监听 8000
+    ports:
+      - "${BLOG_PORT:-8080}:8000"
+    volumes:
+      # SQLite 数据库、SECRET_KEY 等持久化数据都在 /data
+      - blog-data:/data
+    # 可选注入 .env 中的全部变量；文件不存在时静默跳过（compose >= 2.24）
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # 数据目录与 SQLite 路径：容器内固定为 /data，与卷挂载保持一致。
+      # 不跟随宿主机环境变量，避免误把数据库写到容器可写层导致数据丢失。
+      DATA_DIR: "/data"
+      DB_PATH: "/data/blog.db"
+      # 站点绝对链接前缀（RSS/sitemap 使用）
+      SITE_URL: "${SITE_URL:-http://localhost:8080}"
+      # 展示时区（存储始终为 UTC）
+      SITE_TZ: "${SITE_TZ:-Asia/Shanghai}"
+      # 首次初始化管理员（仅在数据库为空时生效）
+      ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin123}"
+      # 评论开关（仅初始化默认值，之后以数据库设置为准）
+      ALLOW_COMMENTS: "${ALLOW_COMMENTS:-true}"
+      # HTTPS 部署时设为 true
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      # 会话有效期（秒）
+      SESSION_MAX_AGE: "${SESSION_MAX_AGE:-604800}"
+      # SECRET_KEY 无缺省值：不在此设置，由 .env（env_file）注入；
+      # 未提供时后端会自动生成并持久化到 /data/.secret_key
+    restart: unless-stopped
+    healthcheck:
+      # 镜像内无 curl，使用 Python 标准库请求 /healthz
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  blog-data:
+    name: blog-data

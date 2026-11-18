@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}归档 · {{ site.site_title }}{% endblock %}
+{% block meta_description %}按年份浏览「{{ site.site_title }}」的全部文章。{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <p class="kicker">按年归档</p>
+    <h1 class="page-title">归档</h1>
+    {% if groups %}
+      <p class="page-sub">所有文章按发表年份收拢在这里。</p>
+    {% endif %}
+  </header>
+
+  {% if groups %}
+    <div class="archive">
+      {% for group in groups %}
+        <section class="archive-group" aria-labelledby="archive-year-{{ group.year }}">
+          <h2 class="archive-year" id="archive-year-{{ group.year }}">
+            {{ group.year }}<span class="archive-year-sub">年</span>
+          </h2>
+          <ul class="archive-list">
+            {% for post in group.posts %}
+              <li class="archive-item">
+                <time class="archive-date" datetime="{{ post.published_at }}">{{ post.published_at|date("%m月%d日") }}</time>
+                <a class="archive-title" href="/post/{{ post.slug|urlencode }}">{{ post.title }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <p class="empty-title">还没有文章</p>
+      <p><a href="/">回到首页</a></p>
+    </div>
+  {% endif %}
+{% endblock %}

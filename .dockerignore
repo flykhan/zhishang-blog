@@ -1,0 +1,48 @@
+# 构建上下文排除项（不影响运行时镜像内容，仅减小上下文体积 / 避免泄露）
+.git
+.gitignore
+.github
+.idea
+.vscode
+
+# 本地数据：SQLite 数据库、SECRET_KEY、备份
+data
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+backups
+
+# Python 开发产物
+__pycache__
+**/__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+.venv
+venv
+
+# 环境与密钥
+.env
+.env.*
+!.env.example
+
+# 开发/部署辅助文件（镜像不需要）
+docker-compose.yml
+docker-compose.*.yml
+Makefile
+scripts
+SPEC.md
+*.md
+!README.md
+
+# 其它
+.DS_Store
+*.log
+tmp

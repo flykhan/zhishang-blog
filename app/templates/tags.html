@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}全部标签 · {{ site.site_title }}{% endblock %}
+{% block meta_description %}「{{ site.site_title }}」的全部文章标签，按文章数量排列。{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <p class="kicker">标签索引</p>
+    <h1 class="page-title">全部标签</h1>
+    {% if tags %}
+      <p class="page-sub">按文章数量排列，点击标签查看相关文章。</p>
+    {% endif %}
+  </header>
+
+  {% if tags %}
+    <div class="tag-cloud">
+      {% for tag in tags %}
+        <a class="tag-cloud-item" href="/tag/{{ tag.name|urlencode }}">
+          <span class="tag-name">{{ tag.name }}</span>
+          <span class="tag-count" aria-label="{{ tag.count }} 篇文章">{{ tag.count }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <p class="empty-title">还没有标签</p>
+      <p><a href="/">回到首页</a></p>
+    </div>
+  {% endif %}
+{% endblock %}

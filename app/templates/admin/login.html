@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="robots" content="noindex, nofollow">
+  <title>登录 · {{ site.site_title }}后台</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/admin.css">
+  <script>
+    /* 防闪烁：登录页独立整页，自带主题初始化 */
+    (function () {
+      try {
+        var stored = window.localStorage.getItem("theme");
+        var theme = stored === "dark" || stored === "light"
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        var root = document.documentElement;
+        root.setAttribute("data-theme", theme);
+        root.style.colorScheme = theme;
+      } catch (err) { /* ignore */ }
+    }());
+  </script>
+</head>
+<body class="admin-body admin-login-body">
+  <button type="button" class="admin-icon-btn login-theme-toggle js-theme-toggle" id="admin-theme-toggle"
+          aria-label="切换到深色模式" title="切换主题">
+    <svg class="admin-icon admin-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+    </svg>
+    <svg class="admin-icon admin-icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>
+    </svg>
+  </button>
+
+  <main class="login-shell">
+    <div class="login-card">
+      <a class="login-brand" href="/" aria-label="{{ site.site_title }} · 返回首页">
+        <span class="login-brand__mark" aria-hidden="true">纸</span>
+        <span class="login-brand__name">{{ site.site_title }}</span>
+      </a>
+
+      <h1 class="login-card__title">登录后台</h1>
+      <p class="login-card__sub">管理文章、评论与站点设置。</p>
+
+      {% if flash %}
+      <div class="admin-flash login-flash">
+        {% for msg in flash %}
+        <div class="admin-flash__item admin-flash__item--{{ msg.kind }}" role="{{ 'alert' if msg.kind == 'err' else 'status' }}">
+          <span class="admin-flash__dot" aria-hidden="true"></span>
+          <span>{{ msg.text }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if error %}
+      <div class="admin-alert admin-alert--err" id="login-error" role="alert">{{ error }}</div>
+      {% endif %}
+
+      <form class="login-form" action="/admin/login" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <div class="field">
+          <label class="field__label" for="login-username">用户名</label>
+          <input class="input" id="login-username" name="username" type="text" maxlength="80"
+                 value="{{ username }}" required autocomplete="username" autocapitalize="off"
+                 spellcheck="false" autofocus>
+        </div>
+        <div class="field">
+          <label class="field__label" for="login-password">密码</label>
+          <input class="input" id="login-password" name="password" type="password" maxlength="200"
+                 required autocomplete="current-password">
+        </div>
+        <button type="submit" class="admin-btn">登录</button>
+      </form>
+
+      <div class="login-alt">
+        <a class="admin-link" href="/">← 返回首页</a>
+        <span class="login-alt__hint">仅站点管理员可登录</span>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{# 公共分页宏：{% from "_pagination.html" import render with context %} #}
+{% macro render(pagination) -%}
+  {% if pagination and pagination.total_pages > 1 %}
+    <nav class="pagination" aria-label="分页导航">
+      {% if pagination.prev_url %}
+        <a class="page-link" href="{{ pagination.prev_url }}" rel="prev">← 上一页</a>
+      {% else %}
+        <span class="page-disabled" aria-hidden="true">← 上一页</span>
+      {% endif %}
+      <span class="page-info">第 <strong>{{ pagination.page }}</strong> / {{ pagination.total_pages }} 页 · 共 {{ pagination.total_items }} 篇</span>
+      {% if pagination.next_url %}
+        <a class="page-link" href="{{ pagination.next_url }}" rel="next">下一页 →</a>
+      {% else %}
+        <span class="page-disabled" aria-hidden="true">下一页 →</span>
+      {% endif %}
+    </nav>
+  {% endif %}
+{%- endmacro %}

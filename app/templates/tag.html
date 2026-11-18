@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "_pagination.html" import render with context %}
+
+{% block title %}标签：{{ tag }} · {{ site.site_title }}{% endblock %}
+{% block meta_description %}浏览「{{ site.site_title }}」中标签为「{{ tag }}」的文章。{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <p class="kicker">标签文章</p>
+    <h1 class="page-title"><span class="tag-hash" aria-hidden="true">#</span>{{ tag }}</h1>
+    {% if pagination.total_items %}
+      <p class="page-sub">共 {{ pagination.total_items }} 篇文章贴着这个标签。</p>
+    {% endif %}
+  </header>
+
+  {% if posts %}
+    <div class="post-list">
+      {% for post in posts %}
+        <article class="post-card">
+          <p class="post-meta">
+            <time datetime="{{ post.published_at }}">{{ post.published_at|date }}</time>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <span>约 {{ post.reading_time }} 分钟</span>
+          </p>
+          <h2 class="post-card-title"><a href="/post/{{ post.slug|urlencode }}">{{ post.title }}</a></h2>
+          {% if post.summary %}
+            <p class="post-card-summary">{{ post.summary }}</p>
+          {% endif %}
+          {% set post_tags = post.tags|taglist %}
+          <div class="post-card-foot">
+            {% if post_tags %}
+              <ul class="tag-list" aria-label="文章标签">
+                {% for post_tag in post_tags %}
+                  <li><a class="tag" href="/tag/{{ post_tag|urlencode }}">{{ post_tag }}</a></li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <span class="post-views">未设标签</span>
+            {% endif %}
+            <span class="post-views">{{ post.views }} 次阅读</span>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <p class="empty-title">这个标签下还没有文章</p>
+      <p><a href="/tags">看看其他标签</a></p>
+    </div>
+  {% endif %}
+
+  {{ render(pagination) }}
+{% endblock %}

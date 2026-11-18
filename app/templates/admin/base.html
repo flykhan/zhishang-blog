@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{% block title %}{{ page_title }} · {{ site.site_title }}后台{% endblock %}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/admin.css">
+  <script>
+    /* 防闪烁：在首次绘制前确定后台主题（后台独立实现，不依赖 style.css） */
+    (function () {
+      try {
+        var stored = window.localStorage.getItem("theme");
+        var theme = stored === "dark" || stored === "light"
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        var root = document.documentElement;
+        root.setAttribute("data-theme", theme);
+        root.style.colorScheme = theme;
+      } catch (err) { /* 隐私模式下 localStorage 不可用，忽略 */ }
+    }());
+  </script>
+</head>
+<body class="admin-body">
+  <a class="admin-skip" href="#main">跳到主要内容</a>
+
+  {% set nav_active = active_nav if active_nav is defined else '' %}
+  {% set pending = pending_comments|default(0) %}
+
+  <header class="admin-topbar">
+    <div class="admin-topbar__inner">
+      <a class="admin-brand" href="/admin" aria-label="纸上 · 管理后台首页">
+        <span class="admin-brand__mark" aria-hidden="true">纸</span>
+        <span class="admin-brand__name">纸上<span class="admin-brand__role">后台</span></span>
+      </a>
+
+      <button type="button" class="admin-nav-toggle" id="admin-nav-toggle"
+              aria-controls="admin-nav" aria-expanded="false" aria-label="展开导航">
+        <svg class="admin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M4 7h16M4 12h16M4 17h16"/>
+        </svg>
+      </button>
+
+      <nav class="admin-nav" id="admin-nav" aria-label="后台导航">
+        <a class="admin-nav__link{% if nav_active == 'dashboard' %} is-active{% endif %}"
+           href="/admin"{% if nav_active == 'dashboard' %} aria-current="page"{% endif %}>仪表盘</a>
+        <a class="admin-nav__link{% if nav_active == 'posts' %} is-active{% endif %}"
+           href="/admin/posts"{% if nav_active == 'posts' %} aria-current="page"{% endif %}>文章</a>
+        <a class="admin-nav__link{% if nav_active == 'new' %} is-active{% endif %}"
+           href="/admin/posts/new"{% if nav_active == 'new' %} aria-current="page"{% endif %}>写文章</a>
+        <a class="admin-nav__link{% if nav_active == 'comments' %} is-active{% endif %}"
+           href="/admin/comments"{% if nav_active == 'comments' %} aria-current="page"{% endif %}>评论{% if pending > 0 %}<span class="admin-badge" aria-hidden="true">{{ pending }}</span><span class="sr-only">（{{ pending }} 条待审核）</span>{% endif %}</a>
+        <a class="admin-nav__link{% if nav_active == 'settings' %} is-active{% endif %}"
+           href="/admin/settings"{% if nav_active == 'settings' %} aria-current="page"{% endif %}>设置</a>
+      </nav>
+
+      <div class="admin-topbar__actions">
+        <button type="button" class="admin-icon-btn js-theme-toggle" id="admin-theme-toggle"
+                aria-label="切换到深色模式" title="切换主题">
+          <svg class="admin-icon admin-icon--sun" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+          <svg class="admin-icon admin-icon--moon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>
+          </svg>
+        </button>
+        {% if user %}
+        <form class="admin-logout" action="/admin/logout" method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm">退出登录</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="admin-main" id="main" tabindex="-1">
+    <div class="admin-container">
+      {% if flash %}
+      <div class="admin-flash" aria-live="polite">
+        {% for msg in flash %}
+        <div class="admin-flash__item admin-flash__item--{{ msg.kind }}" role="{{ 'alert' if msg.kind == 'err' else 'status' }}">
+          <span class="admin-flash__dot" aria-hidden="true"></span>
+          <span>{{ msg.text }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="admin-footer">
+    <div class="admin-container admin-footer__inner">
+      <span>{{ site.site_title }} · 管理后台</span>
+      <span>{{ now_year }} · <a href="/" target="_blank" rel="noopener">查看站点 ↗</a></span>
+    </div>
+  </footer>
+
+  <script src="/static/admin.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

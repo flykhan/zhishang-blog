@@ -1,0 +1,131 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="admin-page-head">
+  <div>
+    <h1 class="admin-page-title">设置</h1>
+    <p class="admin-page-sub">站点信息、关于页内容与后台密码。</p>
+  </div>
+  <div class="admin-page-actions">
+    <a class="admin-btn admin-btn--ghost" href="/" target="_blank" rel="noopener">查看站点 ↗</a>
+  </div>
+</div>
+
+{% if error %}
+<div class="admin-alert admin-alert--err" role="alert">{{ error }}</div>
+{% endif %}
+
+<form class="admin-form" action="/admin/settings" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+  <section class="admin-card">
+    <div class="admin-card__head">
+      <h2 class="admin-card__title">站点设置</h2>
+      <span class="admin-card__hint">展示在站点各处的文字</span>
+    </div>
+    <div class="admin-card__body">
+      <div class="form-grid">
+        <div class="field">
+          <label class="field__label" for="site-title">站点标题</label>
+          <input class="input" id="site-title" name="site_title" type="text" maxlength="80"
+                 value="{{ site.site_title }}" required>
+        </div>
+        <div class="field">
+          <label class="field__label" for="site-subtitle">副标题</label>
+          <input class="input" id="site-subtitle" name="site_subtitle" type="text" maxlength="120"
+                 value="{{ site.site_subtitle }}">
+        </div>
+        <div class="field field--full">
+          <label class="field__label" for="site-description">站点描述</label>
+          <textarea class="input" id="site-description" name="site_description" rows="2"
+                    maxlength="300">{{ site.site_description }}</textarea>
+          <p class="field__hint">用于首页与搜索引擎的 meta description。</p>
+        </div>
+        <div class="field">
+          <label class="field__label" for="author-name">作者名</label>
+          <input class="input" id="author-name" name="author_name" type="text" maxlength="80"
+                 value="{{ site.author_name }}">
+        </div>
+        <div class="field">
+          <label class="field__label" for="posts-per-page">每页文章数</label>
+          <input class="input" id="posts-per-page" name="posts_per_page" type="number"
+                 min="1" max="50" step="1" inputmode="numeric" value="{{ site.posts_per_page }}" required>
+          <p class="field__hint">首页、标签页与归档分页使用，建议 5–20。</p>
+        </div>
+        <div class="field field--full">
+          <label class="field__label" for="author-bio">作者简介</label>
+          <textarea class="input" id="author-bio" name="author_bio" rows="2"
+                    maxlength="300">{{ site.author_bio }}</textarea>
+        </div>
+        <div class="field field--full">
+          <label class="field__label" for="footer-text">页脚文字</label>
+          <input class="input" id="footer-text" name="footer_text" type="text" maxlength="200"
+                 value="{{ site.footer_text }}">
+          <p class="field__hint">可以使用 <code>{year}</code> 占位符，展示时会替换为当前年份。</p>
+        </div>
+        <div class="field field--full">
+          <label class="checkbox-field" for="allow-comments">
+            <input type="checkbox" id="allow-comments" name="allow_comments" value="1"
+                   {% if site.allow_comments == "1" %}checked{% endif %}>
+            <span>
+              允许访客在文章页提交评论
+              <span class="checkbox-field__hint">关闭后访客无法提交新评论，已有评论仍然展示。</span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="admin-card">
+    <div class="admin-card__head">
+      <h2 class="admin-card__title">关于页</h2>
+      <span class="admin-card__hint">Markdown · 展示在 /about</span>
+    </div>
+    <div class="admin-card__body">
+      <div class="field field--full">
+        <label class="field__label" for="about-md">关于页内容</label>
+        <textarea class="input input--mono" id="about-md" name="about_md" rows="12"
+                  spellcheck="false">{{ site.about_md }}</textarea>
+        <p class="field__hint">支持 Markdown 语法，保存后立即生效。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="form-actions">
+    <button type="submit" class="admin-btn">保存设置</button>
+  </div>
+</form>
+
+<section class="admin-card">
+  <div class="admin-card__head">
+    <h2 class="admin-card__title">修改密码</h2>
+    <span class="admin-card__hint">修改后需要重新登录</span>
+  </div>
+  <div class="admin-card__body">
+    <form class="admin-form" action="/admin/password" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <div class="form-grid">
+        <div class="field field--full">
+          <label class="field__label" for="current-password">当前密码</label>
+          <input class="input" id="current-password" name="current_password" type="password" maxlength="200"
+                 required autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label class="field__label" for="new-password">新密码</label>
+          <input class="input" id="new-password" name="new_password" type="password"
+                 required minlength="6" maxlength="200" autocomplete="new-password">
+        </div>
+        <div class="field">
+          <label class="field__label" for="confirm-password">确认新密码</label>
+          <input class="input" id="confirm-password" name="confirm_password" type="password"
+                 required minlength="6" maxlength="200" autocomplete="new-password">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="admin-btn admin-btn--ghost">修改密码</button>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

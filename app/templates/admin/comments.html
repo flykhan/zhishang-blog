@@ -1,0 +1,77 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="admin-page-head">
+  <div>
+    <h1 class="admin-page-title">评论</h1>
+    <p class="admin-page-sub">审核访客评论。待审核的评论不会在文章页展示。</p>
+  </div>
+</div>
+
+<nav class="admin-tabs" aria-label="按状态筛选评论">
+  <a class="admin-tab{% if status_filter == 'pending' %} is-active{% endif %}" href="/admin/comments?status=pending"
+     {% if status_filter == 'pending' %}aria-current="page"{% endif %}>待审核<span class="admin-tab__count">{{ counts.pending }}</span></a>
+  <a class="admin-tab{% if status_filter == 'approved' %} is-active{% endif %}" href="/admin/comments?status=approved"
+     {% if status_filter == 'approved' %}aria-current="page"{% endif %}>已通过<span class="admin-tab__count">{{ counts.approved }}</span></a>
+  <a class="admin-tab{% if status_filter == 'all' %} is-active{% endif %}" href="/admin/comments?status=all"
+     {% if status_filter == 'all' %}aria-current="page"{% endif %}>全部<span class="admin-tab__count">{{ counts.pending + counts.approved }}</span></a>
+</nav>
+
+<div class="admin-stack">
+  <section class="admin-card">
+    {% if comments %}
+    <ul class="comment-list">
+      {% for c in comments %}
+      <li class="comment-item">
+        <div class="comment-item__meta">
+          <span class="comment-item__author">{{ c.author }}</span>
+          {% if c.email %}
+          <a class="comment-item__email" href="mailto:{{ c.email }}">{{ c.email }}</a>
+          {% endif %}
+          <span class="status-pill status-pill--{{ c.status }}">{{ '已通过' if c.status == 'approved' else '待审核' }}</span>
+          <time class="comment-item__time" datetime="{{ c.created_at }}">{{ c.created_at|date }}</time>
+        </div>
+        <p class="comment-item__content">{{ c.content }}</p>
+        <div class="comment-item__foot">
+          <a class="admin-link" href="/post/{{ c.post_slug }}#comments" target="_blank" rel="noopener">《{{ c.post_title }}》</a>
+          <div class="comment-item__actions">
+            {% if c.status == 'pending' %}
+            <form class="inline-form" action="/admin/comments/{{ c.id }}/approve" method="post">
+              <input type="hidden" name="csrf_token" value="{{ csrf }}">
+              <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm">通过并展示</button>
+            </form>
+            {% endif %}
+            <form class="inline-form" action="/admin/comments/{{ c.id }}/delete" method="post">
+              <input type="hidden" name="csrf_token" value="{{ csrf }}">
+              <button type="submit" class="admin-btn admin-btn--danger admin-btn--sm"
+                      data-confirm="确定删除这条来自「{{ c.author }}」的评论？">删除</button>
+            </form>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% if pagination.total_pages > 1 %}
+    <nav class="admin-pagination" aria-label="评论分页">
+      {% if pagination.prev_url %}
+      <a class="admin-btn admin-btn--ghost admin-btn--sm" href="{{ pagination.prev_url }}" rel="prev">← 上一页</a>
+      {% else %}
+      <span class="admin-btn admin-btn--ghost admin-btn--sm is-disabled" aria-disabled="true">← 上一页</span>
+      {% endif %}
+      <span class="admin-pagination__info">第 {{ pagination.page }} / {{ pagination.total_pages }} 页 · 共 {{ pagination.total_items }} 条</span>
+      {% if pagination.next_url %}
+      <a class="admin-btn admin-btn--ghost admin-btn--sm" href="{{ pagination.next_url }}" rel="next">下一页 →</a>
+      {% else %}
+      <span class="admin-btn admin-btn--ghost admin-btn--sm is-disabled" aria-disabled="true">下一页 →</span>
+      {% endif %}
+    </nav>
+    {% endif %}
+    {% else %}
+    <p class="empty-state">
+      <span class="empty-state__icon" aria-hidden="true">💬</span>
+      {% if status_filter == 'pending' %}没有待审核的评论，很清静。{% elif status_filter == 'approved' %}还没有已通过的评论。{% else %}还没有收到任何评论。{% endif %}
+    </p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

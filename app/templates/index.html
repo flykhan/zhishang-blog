@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_pagination.html" import render with context %}
+
+{% block title %}{% if pagination.page > 1 %}第 {{ pagination.page }} 页 · {% endif %}{{ site.site_title }}{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <p class="kicker">{% if pagination.page > 1 %}第 {{ pagination.page }} 页{% else %}最新发布{% endif %}</p>
+    <h1 class="page-title">{% if pagination.page > 1 %}继续阅读{% else %}近日文章{% endif %}</h1>
+    {% if pagination.page == 1 and pagination.total_items > 0 %}
+      <p class="page-sub">共 {{ pagination.total_items }} 篇文字，愿你在纸页间慢慢读。</p>
+    {% endif %}
+  </header>
+
+  {% if posts %}
+    <div class="post-list">
+      {% for post in posts %}
+        <article class="post-card">
+          <p class="post-meta">
+            <time datetime="{{ post.published_at }}">{{ post.published_at|date }}</time>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <span>约 {{ post.reading_time }} 分钟</span>
+          </p>
+          <h2 class="post-card-title"><a href="/post/{{ post.slug|urlencode }}">{{ post.title }}</a></h2>
+          {% if post.summary %}
+            <p class="post-card-summary">{{ post.summary }}</p>
+          {% endif %}
+          {% set post_tags = post.tags|taglist %}
+          <div class="post-card-foot">
+            {% if post_tags %}
+              <ul class="tag-list" aria-label="文章标签">
+                {% for tag in post_tags %}
+                  <li><a class="tag" href="/tag/{{ tag|urlencode }}">{{ tag }}</a></li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <span class="post-views">未设标签</span>
+            {% endif %}
+            <span class="post-views">{{ post.views }} 次阅读</span>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">
+      <p class="empty-title">还没有文章</p>
+      <p>纸页留着空白，等待第一篇文字落下。</p>
+    </div>
+  {% endif %}
+
+  {{ render(pagination) }}
+{% endblock %}

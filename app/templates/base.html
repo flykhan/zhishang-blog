@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="{% block meta_description %}{{ site.site_description }}{% endblock %}">
+  <meta name="theme-color" content="#faf8f4">
+  <title>{% block title %}{{ site.site_title }}{% endblock %}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="alternate" type="application/rss+xml" title="{{ site.site_title }} · RSS" href="/feed.xml">
+  <link rel="canonical" href="{{ request.url }}">
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var theme = stored === "dark" || stored === "light" ? stored : (prefersDark ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.style.colorScheme = theme;
+      } catch (error) {
+        /* 存储不可用时使用默认浅色主题。 */
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body class="site-body {% block body_class %}{% endblock %}">
+  <div class="reading-progress" id="reading-progress" aria-hidden="true"></div>
+  <a class="skip-link" href="#main">跳到正文</a>
+  {% set current_path = request.url.path %}
+  <header class="site-header">
+    <div class="wrap header-wrap">
+      <div class="masthead">
+        <a class="masthead-title" href="/">{{ site.site_title }}</a>
+        {% if site.site_subtitle %}
+          <p class="masthead-subtitle">{{ site.site_subtitle }}</p>
+        {% endif %}
+      </div>
+      <div class="header-actions">
+        <a class="icon-btn" href="/search" aria-label="搜索文章" title="搜索"{% if current_path == "/search" %} aria-current="page"{% endif %}>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"></circle><path d="m16.5 16.5 4 4"></path></svg>
+        </a>
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="切换到深色模式" aria-pressed="false" title="切换到深色模式">
+          <svg class="icon icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4.2"></circle><path d="M12 2.6v2.1M12 19.3v2.1M4.7 4.7l1.5 1.5M17.8 17.8l1.5 1.5M2.6 12h2.1M19.3 12h2.1M4.7 19.3l1.5-1.5M17.8 6.2l1.5-1.5"></path></svg>
+          <svg class="icon icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7.2 7.2 0 1 0 10.5 10.5Z"></path></svg>
+        </button>
+      </div>
+    </div>
+    <nav class="site-nav" aria-label="主导航">
+      <div class="wrap nav-wrap">
+        <a class="nav-link{% if current_path == "/" or current_path.startswith("/page/") %} is-active{% endif %}" href="/"{% if current_path == "/" or current_path.startswith("/page/") %} aria-current="page"{% endif %}>首页</a>
+        <a class="nav-link{% if current_path.startswith("/archive") %} is-active{% endif %}" href="/archive"{% if current_path.startswith("/archive") %} aria-current="page"{% endif %}>归档</a>
+        <a class="nav-link{% if current_path == "/tags" or current_path.startswith("/tag/") %} is-active{% endif %}" href="/tags"{% if current_path == "/tags" or current_path.startswith("/tag/") %} aria-current="page"{% endif %}>标签</a>
+        <a class="nav-link{% if current_path == "/about" %} is-active{% endif %}" href="/about"{% if current_path == "/about" %} aria-current="page"{% endif %}>关于</a>
+        {% if user %}
+          <a class="nav-link{% if current_path.startswith("/admin") %} is-active{% endif %}" href="/admin"{% if current_path.startswith("/admin") %} aria-current="page"{% endif %}>管理</a>
+        {% endif %}
+      </div>
+    </nav>
+  </header>
+  <main id="main" class="site-main" tabindex="-1">
+    <div class="wrap">
+      {% if flash %}
+        <div class="flashes" role="status" aria-live="polite">
+          {% for item in flash %}
+            <p class="flash flash-{{ item.kind }}">{{ item.text }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap footer-wrap">
+      <p class="footer-text">{{ site.footer_text|footer }}</p>
+      <p class="footer-links">
+        <a href="/feed.xml">RSS 订阅</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/archive">归档</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/about">关于</a>
+        {% if user %}
+          <span class="footer-sep" aria-hidden="true">·</span>
+          <a href="/admin">管理</a>
+        {% endif %}
+      </p>
+    </div>
+  </footer>
+  <button class="to-top" id="to-top" type="button" aria-label="返回顶部" aria-hidden="true" title="返回顶部">↑</button>
+  <script src="/static/app.js"></script>
+</body>
+</html>

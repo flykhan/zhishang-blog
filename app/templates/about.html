@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}关于 · {{ site.site_title }}{% endblock %}
+{% block meta_description %}{{ site.author_bio or site.site_description }}{% endblock %}
+
+{% block content %}
+  <header class="page-head">
+    <p class="kicker">关于</p>
+    <h1 class="page-title">关于「{{ site.site_title }}」</h1>
+  </header>
+
+  <div class="about-grid">
+    <section class="about-body prose" aria-label="关于本站">
+      {% if site.about_md %}
+        {{ site.about_md|md }}
+      {% else %}
+        <p>这里还没有写下关于页的内容。</p>
+      {% endif %}
+    </section>
+
+    <aside class="author-card" aria-label="作者信息">
+      <p class="author-name">{{ site.author_name }}</p>
+      {% if site.author_bio %}
+        <p class="author-bio">{{ site.author_bio }}</p>
+      {% endif %}
+      <p class="author-links">
+        <a href="/feed.xml">RSS 订阅</a>
+        <span class="footer-sep" aria-hidden="true">·</span>
+        <a href="/archive">全部文章</a>
+      </p>
+    </aside>
+  </div>
+{% endblock %}

@@ -1,0 +1,139 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="admin-page-head">
+  <div>
+    <h1 class="admin-page-title">{{ page_title }}</h1>
+    <p class="admin-page-sub">欢迎回来{% if user %}，{{ user.username }}{% endif %}。这里是站点的实时概览。</p>
+  </div>
+  <div class="admin-page-actions">
+    <a class="admin-btn" href="/admin/posts/new">写文章</a>
+  </div>
+</div>
+
+<div class="admin-stack">
+  <section class="stat-grid" aria-label="站点统计">
+    <a class="stat-card" href="/admin/posts?status=published">
+      <span class="stat-card__label">已发布文章</span>
+      <span class="stat-card__value">{{ stats.published }}</span>
+      <span class="stat-card__hint">篇</span>
+    </a>
+    <a class="stat-card" href="/admin/posts?status=draft">
+      <span class="stat-card__label">草稿</span>
+      <span class="stat-card__value">{{ stats.drafts }}</span>
+      <span class="stat-card__hint">篇</span>
+    </a>
+    <div class="stat-card">
+      <span class="stat-card__label">总浏览量</span>
+      <span class="stat-card__value">{{ stats.views }}</span>
+      <span class="stat-card__hint">次</span>
+    </div>
+    <a class="stat-card{% if stats.comments_pending > 0 %} stat-card--accent{% endif %}" href="/admin/comments?status=pending">
+      <span class="stat-card__label">待审核评论</span>
+      <span class="stat-card__value">{{ stats.comments_pending }}</span>
+      <span class="stat-card__hint">条</span>
+    </a>
+    <div class="stat-card">
+      <span class="stat-card__label">评论总数</span>
+      <span class="stat-card__value">{{ stats.comments_total }}</span>
+      <span class="stat-card__hint">条</span>
+    </div>
+  </section>
+
+  <section class="admin-card">
+    <div class="admin-card__head">
+      <h2 class="admin-card__title">最近文章</h2>
+      <a class="admin-link" href="/admin/posts">全部文章 →</a>
+    </div>
+    {% if posts %}
+    <div class="table-wrap">
+      <table class="admin-table">
+        <caption class="sr-only">最近更新的文章</caption>
+        <thead>
+          <tr>
+            <th scope="col">标题</th>
+            <th scope="col">状态</th>
+            <th scope="col" class="col-hide-sm">浏览</th>
+            <th scope="col" class="col-hide-sm">更新时间</th>
+            <th scope="col" class="col-actions">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in posts %}
+          <tr>
+            <td class="cell-title">
+              <a href="/admin/posts/{{ p.id }}/edit">{{ p.title }}</a>
+              <span class="cell-sub">/post/{{ p.slug }}</span>
+            </td>
+            <td>
+              <span class="status-pill status-pill--{{ p.status }}">{{ '已发布' if p.status == 'published' else '草稿' }}</span>
+            </td>
+            <td class="col-hide-sm">{{ p.views }}</td>
+            <td class="col-hide-sm"><time datetime="{{ p.updated_at }}">{{ p.updated_at|date }}</time></td>
+            <td class="cell-actions">
+              <div class="cell-actions__inner">
+                <a class="admin-btn admin-btn--ghost admin-btn--sm" href="/admin/posts/{{ p.id }}/edit">编辑</a>
+                {% if p.status == 'published' %}
+                <a class="admin-btn admin-btn--ghost admin-btn--sm" href="/post/{{ p.slug }}" target="_blank" rel="noopener">查看</a>
+                {% endif %}
+                <form class="inline-form" action="/admin/posts/{{ p.id }}/toggle" method="post">
+                  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                  <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm">{{ '转草稿' if p.status == 'published' else '发布' }}</button>
+                </form>
+                <form class="inline-form" action="/admin/posts/{{ p.id }}/delete" method="post">
+                  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                  <button type="submit" class="admin-btn admin-btn--danger admin-btn--sm"
+                          data-confirm="确定删除文章「{{ p.title }}」？删除后不可恢复，文章下的评论也会一并删除。">删除</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-state"><span class="empty-state__icon" aria-hidden="true">✎</span>还没有文章。<a href="/admin/posts/new">写第一篇</a></p>
+    {% endif %}
+  </section>
+
+  <section class="admin-card">
+    <div class="admin-card__head">
+      <h2 class="admin-card__title">最近评论</h2>
+      <a class="admin-link" href="/admin/comments">评论管理 →</a>
+    </div>
+    {% if recent_comments %}
+    <ul class="comment-list comment-list--compact">
+      {% for c in recent_comments %}
+      <li class="comment-item">
+        <div class="comment-item__meta">
+          <span class="comment-item__author">{{ c.author }}</span>
+          <span class="status-pill status-pill--{{ c.status }}">{{ '已通过' if c.status == 'approved' else '待审核' }}</span>
+          <time class="comment-item__time" datetime="{{ c.created_at }}">{{ c.created_at|date }}</time>
+        </div>
+        <p class="comment-item__content">{{ c.content|excerpt(80) }}</p>
+        <div class="comment-item__foot">
+          <a class="admin-link" href="/post/{{ c.post_slug }}#comments" target="_blank" rel="noopener">《{{ c.post_title }}》</a>
+          <div class="comment-item__actions">
+            {% if c.status == 'pending' %}
+            <form class="inline-form" action="/admin/comments/{{ c.id }}/approve" method="post">
+              <input type="hidden" name="csrf_token" value="{{ csrf }}">
+              <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm">通过</button>
+            </form>
+            {% endif %}
+            <form class="inline-form" action="/admin/comments/{{ c.id }}/delete" method="post">
+              <input type="hidden" name="csrf_token" value="{{ csrf }}">
+              <button type="submit" class="admin-btn admin-btn--danger admin-btn--sm"
+                      data-confirm="确定删除这条来自「{{ c.author }}」的评论？">删除</button>
+            </form>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty-state"><span class="empty-state__icon" aria-hidden="true">💬</span>还没有评论。</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
