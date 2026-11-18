@@ -98,6 +98,105 @@ def increment_views(post_id: int) -> None:
         con.execute("UPDATE posts SET views = views + 1 WHERE id = ?", (post_id,))
 
 
+# ---------------------------------------------------------------- 文章：相邻 / 相关
+
+_POST_BRIEF_SQL = "SELECT id, slug, title, published_at, created_at FROM posts "
+_ORDER_KEY_SQL = "COALESCE(published_at, created_at)"
+
+
+def _post_brief(row: sqlite3.Row) -> dict:
+    """相邻/相关文章只需要的最小字段（published_at 用 COALESCE 后的值）。"""
+    return {
+        "id": int(row["id"]),
+        "slug": row["slug"],
+        "title": row["title"],
+        "published_at": row["published_at"] or row["created_at"],
+    }
+
+
+def get_adjacent_posts(post: dict | None) -> dict:
+    """返回文章页的上一篇（更早）与下一篇（更新）。
+
+    仅统计已发布文章，顺序键为 COALESCE(published_at, created_at)，同一时间按 id 兜底。
+    """
+    if not post:
+        return {"prev": None, "next": None}
+    post_id = int(post["id"])
+    published = str(post.get("published_at") or post.get("created_at") or "")
+    with db.get_conn() as con:
+        prev_row = con.execute(
+            _POST_BRIEF_SQL
+            + "WHERE status = 'published' "
+            f"AND ({_ORDER_KEY_SQL} < ? OR ({_ORDER_KEY_SQL} = ? AND id < ?)) "
+            f"ORDER BY {_ORDER_KEY_SQL} DESC, id DESC LIMIT 1",
+            (published, published, post_id),
+        ).fetchone()
+        next_row = con.execute(
+            _POST_BRIEF_SQL
+            + "WHERE status = 'published' "
+            f"AND ({_ORDER_KEY_SQL} > ? OR ({_ORDER_KEY_SQL} = ? AND id > ?)) "
+            f"ORDER BY {_ORDER_KEY_SQL} ASC, id ASC LIMIT 1",
+            (published, published, post_id),
+        ).fetchone()
+    return {
+        "prev": _post_brief(prev_row) if prev_row else None,
+        "next": _post_brief(next_row) if next_row else None,
+    }
+
+
+def related_posts(post: dict | None, limit: int = 3) -> list[dict]:
+    """按共享标签数降序、再按发布时间降序挑相关文章，不足时用最新文章补足。
+
+    仅统计已发布文章并排除自身；共享标签数为 0 的文章不会被优先选中，
+    仅在「无标签或匹配不足 limit」时作为最新文章补位。
+    """
+    if not post:
+        return []
+    try:
+        post_id = int(post["id"])
+        limit = int(limit)
+    except (KeyError, TypeError, ValueError):
+        return []
+    if limit <= 0:
+        return []
+    limit = min(limit, 20)
+
+    current_tags = {tag.casefold() for tag in taglist(post.get("tags") or "")}
+    with db.get_conn() as con:
+        rows = con.execute(
+            "SELECT id, slug, title, tags, published_at, created_at FROM posts "
+            "WHERE status = 'published' AND id <> ? "
+            f"ORDER BY {_ORDER_KEY_SQL} DESC, id DESC",
+            (post_id,),
+        ).fetchall()
+
+    # rows 已按发布时间倒序，稳定排序后同一共享数内仍保持时间倒序。
+    candidates: list[tuple[int, dict]] = []
+    for row in rows:
+        shared = len(
+            current_tags.intersection(
+                {tag.casefold() for tag in taglist(row["tags"] or "")}
+            )
+        )
+        candidates.append((shared, _post_brief(row)))
+    matched = sorted(
+        (item for item in candidates if item[0] > 0), key=lambda item: -item[0]
+    )
+    chosen = [brief for _, brief in matched[:limit]]
+
+    # 无标签 / 匹配不足：按最新发布时间补足（去重、排除自身）。
+    if len(chosen) < limit:
+        chosen_ids = {item["id"] for item in chosen}
+        for _, brief in candidates:
+            if len(chosen) >= limit:
+                break
+            if brief["id"] in chosen_ids:
+                continue
+            chosen.append(brief)
+            chosen_ids.add(brief["id"])
+    return chosen
+
+
 def count_posts_by_tag(tag: str) -> int:
     pattern = f"%,{_escape_like(tag)},%"
     with db.get_conn() as con:

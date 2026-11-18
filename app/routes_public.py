@@ -182,6 +182,7 @@ def post_detail(request: Request, slug: str):
     site = repo.get_settings()
     og_image = _absolute_image_url(_first_content_image(post["content_md"]))
     comments = repo.list_approved_comments(post["id"])
+    adjacent = repo.get_adjacent_posts(post)
     return render(
         request,
         "post.html",
@@ -194,6 +195,9 @@ def post_detail(request: Request, slug: str):
         page_title=post["title"],
         og_image=og_image,
         article_jsonld=_article_jsonld(post, site, og_image),
+        prev_post=adjacent["prev"],
+        next_post=adjacent["next"],
+        related_posts=repo.related_posts(post, limit=3),
     )
 
 

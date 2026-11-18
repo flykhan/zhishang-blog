@@ -22,44 +22,100 @@
 {% endblock %}
 
 {% block content %}
-  <article class="post">
-    <header class="post-header">
-      {% set post_tags = post.tags|taglist %}
-      {% if post_tags %}
-        <ul class="tag-list" aria-label="文章标签">
-          {% for tag in post_tags %}
-            <li><a class="tag" href="/tag/{{ tag|urlencode }}">{{ tag }}</a></li>
-          {% endfor %}
-        </ul>
+  <div class="post-layout">
+    <article class="post">
+      <header class="post-header">
+        {% set post_tags = post.tags|taglist %}
+        {% if post_tags %}
+          <ul class="tag-list" aria-label="文章标签">
+            {% for tag in post_tags %}
+              <li><a class="tag" href="/tag/{{ tag|urlencode }}">{{ tag }}</a></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        <h1 class="post-title">{{ post.title }}</h1>
+        {% if post.summary %}
+          <p class="post-lede">{{ post.summary|clean_summary }}</p>
+        {% endif %}
+        <p class="post-meta">
+          <time datetime="{{ post.published_at }}">{{ post.published_at|date }}</time>
+          <span class="meta-sep" aria-hidden="true">·</span>
+          <span>约 {{ post.reading_time }} 分钟</span>
+          <span class="meta-sep" aria-hidden="true">·</span>
+          <span>{{ post.views }} 次阅读</span>
+        </p>
+      </header>
+
+      <div class="prose">
+        {{ post.content_html|safe }}
+      </div>
+
+      <footer class="post-footer">
+        <p class="post-end" aria-hidden="true">· 完 ·</p>
+        {% if post_tags %}
+          <ul class="tag-list" aria-label="文章标签">
+            {% for tag in post_tags %}
+              <li><a class="tag" href="/tag/{{ tag|urlencode }}">{{ tag }}</a></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        <div class="post-share">
+          <button class="share-copy" type="button" data-share-copy>复制链接</button>
+        </div>
+      </footer>
+    </article>
+
+    <aside class="post-aside" id="post-aside" aria-label="文章目录">
+      <nav class="post-toc" id="post-toc" aria-label="目录">
+        <p class="toc-heading">目录</p>
+        <ol class="toc-list" id="toc-list"></ol>
+      </nav>
+    </aside>
+  </div>
+
+  {% if prev_post or next_post %}
+    <nav class="post-pager" aria-label="文章导航">
+      {% if prev_post %}
+        <a class="pager-link pager-prev" href="/post/{{ prev_post.slug|urlencode }}">
+          <span class="pager-label">← 上一篇</span>
+          <span class="pager-title">{{ prev_post.title }}</span>
+        </a>
       {% endif %}
-      <h1 class="post-title">{{ post.title }}</h1>
-      {% if post.summary %}
-        <p class="post-lede">{{ post.summary|clean_summary }}</p>
+      {% if next_post %}
+        <a class="pager-link pager-next" href="/post/{{ next_post.slug|urlencode }}">
+          <span class="pager-label">下一篇 →</span>
+          <span class="pager-title">{{ next_post.title }}</span>
+        </a>
       {% endif %}
-      <p class="post-meta">
-        <time datetime="{{ post.published_at }}">{{ post.published_at|date }}</time>
-        <span class="meta-sep" aria-hidden="true">·</span>
-        <span>约 {{ post.reading_time }} 分钟</span>
-        <span class="meta-sep" aria-hidden="true">·</span>
-        <span>{{ post.views }} 次阅读</span>
+    </nav>
+  {% endif %}
+
+  {% if related_posts %}
+    <section class="related-posts" aria-labelledby="related-title">
+      <h2 class="section-title" id="related-title">相关文章</h2>
+      <ul class="related-list">
+        {% for related in related_posts %}
+          <li class="related-item">
+            <time class="related-date" datetime="{{ related.published_at }}">{{ related.published_at|date("%Y-%m-%d") }}</time>
+            <a class="related-link" href="/post/{{ related.slug|urlencode }}">{{ related.title }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+
+  <aside class="author-card author-card--post" aria-label="作者信息">
+    <span class="author-avatar" aria-hidden="true">{{ site.author_name[0] if site.author_name else "纸" }}</span>
+    <div class="author-card-body">
+      <p class="author-name">{{ site.author_name }}</p>
+      {% if site.author_bio %}
+        <p class="author-bio">{{ site.author_bio }}</p>
+      {% endif %}
+      <p class="author-links">
+        <a href="/about">关于</a> · <a href="/feed.xml">RSS</a> · <a href="/">全部文章</a>
       </p>
-    </header>
-
-    <div class="prose">
-      {{ post.content_html|safe }}
     </div>
-
-    <footer class="post-footer">
-      <p class="post-end" aria-hidden="true">· 完 ·</p>
-      {% if post_tags %}
-        <ul class="tag-list" aria-label="文章标签">
-          {% for tag in post_tags %}
-            <li><a class="tag" href="/tag/{{ tag|urlencode }}">{{ tag }}</a></li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    </footer>
-  </article>
+  </aside>
 
   <section class="comments" id="comments" aria-labelledby="comments-title">
     <h2 class="section-title" id="comments-title">
