@@ -1,0 +1,49 @@
+# 「纸上」博客系统 — 使用已发布镜像部署（无需本地构建）
+#
+# 镜像：flykhan/zhishang-blog（Docker Hub，linux/amd64）
+# 使用：
+#   cp .env.example .env        # 可选：按需修改密码、域名等
+#   docker compose -f docker-compose.release.yml up -d
+#   访问 http://localhost:${BLOG_PORT:-8080}
+#
+# 说明：
+# - 该文件与 docker-compose.yml 等价，只是把 build 换成从 Docker Hub 拉取镜像；
+# - 与 docker-compose.yml 不要在同一台机器同时启动（container_name/端口会冲突）；
+# - 数据卷、环境变量、健康检查与主 compose 完全一致。
+
+services:
+  blog:
+    image: flykhan/zhishang-blog:1.0.0
+    container_name: zhishang-blog
+    # 容器内固定监听 8000；默认只绑定本机，公网访问走反向代理
+    ports:
+      - "127.0.0.1:${BLOG_PORT:-8080}:8000"
+    volumes:
+      - blog-data:/data
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: "/data"
+      DB_PATH: "/data/blog.db"
+      SITE_URL: "${SITE_URL:-http://localhost:8080}"
+      SITE_TZ: "${SITE_TZ:-Asia/Shanghai}"
+      ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      ALLOW_COMMENTS: "${ALLOW_COMMENTS:-true}"
+      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      TRUST_PROXY: "${TRUST_PROXY:-false}"
+      MAX_BODY_BYTES: "${MAX_BODY_BYTES:-1048576}"
+      MAX_IMPORT_BYTES: "${MAX_IMPORT_BYTES:-26214400}"
+      SESSION_MAX_AGE: "${SESSION_MAX_AGE:-604800}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  blog-data:
+    name: ${DATA_VOLUME:-blog-data}

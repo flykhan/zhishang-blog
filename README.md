@@ -14,6 +14,7 @@
 - [Markdown 导入](#markdown-导入)
 - [技术栈](#技术栈)
 - [快速开始（Docker）](#快速开始docker)
+- [已发布镜像（Docker Hub）](#已发布镜像docker-hub)
 - [本地开发](#本地开发)
 - [环境变量](#环境变量)
 - [目录结构](#目录结构)
@@ -149,6 +150,31 @@ docker compose down
 git pull
 docker compose up -d --build   # 数据卷 blog-data 会保留
 ```
+
+---
+
+## 已发布镜像（Docker Hub）
+
+镜像：`flykhan/zhishang-blog`（linux/amd64），manifest digest：
+
+```
+sha256:d19202f3be0160121aa1ed9818a9c96744338aac7257a79ca4a10c6fa7921127
+```
+
+| Tag | 说明 |
+|---|---|
+| `1.0.0` | 固定版本（当前最新） |
+| `1.0` | 1.0.x 版本线 |
+| `latest` | 最新构建 |
+
+```bash
+docker pull flykhan/zhishang-blog:1.0.0
+
+# 使用仓库内 release compose（不构建，直接拉镜像）
+docker compose -f docker-compose.release.yml up -d
+```
+
+镜像不含站点数据与密钥；首次启动会自动初始化 SQLite，并按 `ADMIN_PASSWORD` 环境变量创建管理员（未设置时生成随机密码写入 `/data/initial_admin_password.txt`）。升级前请先备份数据卷。
 
 ---
 
