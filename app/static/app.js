@@ -80,21 +80,66 @@
 
   /* ---------- 吸顶页头 ---------- */
 
+  /* 页头收紧（.is-stuck）会改变自身高度。此前 .site-header 是 position:sticky
+     且仍占文档流，高度 186px→87px 会把整页内容瞬间顶起约 99px；Chrome 的
+     scroll anchoring 又会修正滚动位置、再次越过 JS 阈值，两者形成正反馈，
+     表现为页面上下来回跳。现在让页头 fixed 脱离文档流，body 用
+     --header-base-h 预留基准高度，收紧只改变覆盖层，正文不再位移；
+     无 JS 时未加 header-fixed，保持原 sticky 降级行为。 */
   const siteHeader = document.querySelector(".site-header");
   if (siteHeader) {
-    const STUCK_OFFSET = 120;
+    const STUCK_ON = 120; // scrollY 超过该值收紧
+    const STUCK_OFF = 96; // 低于该值还原（回滞，避免阈值附近反复切换）
     const raf =
       typeof window.requestAnimationFrame === "function"
         ? window.requestAnimationFrame.bind(window)
         : function (callback) {
             return window.setTimeout(callback, 16);
           };
-    let stuck = null;
+    let stuck = false;
     let scheduled = false;
+    let resizeScheduled = false;
+
+    /* 测量「未收紧」时的页头基准高度。测量期间临时移除 is-stuck，并关闭页头
+       及其所有子元素的过渡（否则强制布局会读到 0.25s 过渡的中间值），
+       强制同步布局后读取，再原样恢复。全部在同一帧内完成，不会产生可见跳变。 */
+    const measureBaseHeight = function () {
+      const nodes = [siteHeader].concat(
+        Array.prototype.slice.call(siteHeader.querySelectorAll("*"))
+      );
+      const previousTransitions = nodes.map(function (node) {
+        return node.style.transition;
+      });
+      nodes.forEach(function (node) {
+        node.style.transition = "none";
+      });
+      siteHeader.classList.remove("is-stuck");
+      void siteHeader.offsetHeight; // 强制同步布局
+      const baseHeight = siteHeader.getBoundingClientRect().height;
+      if (stuck) {
+        siteHeader.classList.add("is-stuck");
+        void siteHeader.offsetHeight;
+      }
+      nodes.forEach(function (node, index) {
+        node.style.transition = previousTransitions[index];
+      });
+      return baseHeight;
+    };
+
+    /* 把基准高度写进 CSS 变量并启用 fixed 布局；量不到高度时退回 sticky。 */
+    const applyBaseHeight = function () {
+      const baseHeight = measureBaseHeight();
+      if (!(baseHeight > 0)) {
+        return;
+      }
+      root.style.setProperty("--header-base-h", baseHeight + "px");
+      root.classList.add("header-fixed");
+    };
 
     const syncHeader = function () {
       scheduled = false;
-      const nextStuck = (window.scrollY || window.pageYOffset || 0) > STUCK_OFFSET;
+      const offset = window.scrollY || window.pageYOffset || 0;
+      const nextStuck = stuck ? offset > STUCK_OFF : offset > STUCK_ON;
       if (nextStuck !== stuck) {
         stuck = nextStuck;
         siteHeader.classList.toggle("is-stuck", stuck);
@@ -109,9 +154,26 @@
       raf(syncHeader);
     };
 
+    /* 初始化：先把页头固定并预留基准高度，再做首次状态同步。 */
+    applyBaseHeight();
     syncHeader();
     window.addEventListener("scroll", requestHeaderSync, { passive: true });
-    window.addEventListener("resize", requestHeaderSync);
+
+    /* 视口尺寸变化会改变页头折行/字号，需重测基准高度（rAF 去抖）。 */
+    const remeasureHeader = function () {
+      if (resizeScheduled) {
+        return;
+      }
+      resizeScheduled = true;
+      raf(function () {
+        resizeScheduled = false;
+        applyBaseHeight();
+        syncHeader();
+      });
+    };
+
+    window.addEventListener("resize", remeasureHeader);
+    window.addEventListener("orientationchange", remeasureHeader);
   }
 
   /* ---------- 返回顶部 ---------- */
