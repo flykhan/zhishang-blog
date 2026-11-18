@@ -217,6 +217,19 @@ button {
     box-shadow 0.25s ease;
 }
 
+/* JS 启用 fixed 方案：页头脱离文档流、由 body 预留基准高度。
+   收紧时只改变覆盖层高度，不再把正文顶上去（无 JS 时仍走上面的 sticky 降级）。 */
+html.header-fixed .site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+html.header-fixed body {
+  padding-top: var(--header-base-h, 0px);
+}
+
 .site-header.is-stuck {
   padding-top: 0.85rem;
   background: var(--header-bg-stuck);
@@ -1770,6 +1783,11 @@ textarea {
   body {
     background: #fff;
     color: #000;
+  }
+
+  /* 打印时页头被隐藏，去掉为 fixed 页头预留的空白。 */
+  html.header-fixed body {
+    padding-top: 0;
   }
 
   .site-header,
