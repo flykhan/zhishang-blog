@@ -210,8 +210,12 @@ def save_post(
     tags: str,
     content_md: str,
     status: str,
+    published_at: str | None = None,
 ) -> int | None:
-    """新建或更新文章，返回文章 id。"""
+    """新建或更新文章，返回文章 id。
+
+    published_at 用于导入场景保留原始发布时间；为空时回退到当前时间。
+    """
     title = (title or "").strip()[:200]
     content_md = content_md or ""
     tags = normalize_tags(tags)
@@ -219,6 +223,7 @@ def save_post(
     if not summary:
         summary = excerpt(plain_text(content_md), 150)
     status = status if status in POST_STATUSES else "draft"
+    explicit_published_at = (published_at or "").strip() or None
     now = utc_now_iso()
 
     with db.get_conn() as con:
@@ -228,9 +233,14 @@ def save_post(
                 return None
             base = _auto_slug(title, slug) or f"post-{post_id}"
             new_slug = _unique_slug(con, base, exclude_id=post_id)
-            published_at = row["published_at"]
-            if status == "published" and not published_at:
-                published_at = now
+            effective_published_at = row["published_at"]
+            if status == "published":
+                effective_published_at = (
+                    explicit_published_at or effective_published_at or now
+                )
+                published_at = effective_published_at
+            else:
+                published_at = effective_published_at
             con.execute(
                 "UPDATE posts SET slug = ?, title = ?, summary = ?, content_md = ?, "
                 "tags = ?, status = ?, updated_at = ?, published_at = ? WHERE id = ?",
@@ -254,7 +264,7 @@ def save_post(
                 status,
                 now,
                 now,
-                now if status == "published" else None,
+                (explicit_published_at or now) if status == "published" else None,
             ),
         )
         return int(cur.lastrowid)

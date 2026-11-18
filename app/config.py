@@ -71,6 +71,7 @@ class Settings:
     port: int
     trust_proxy: bool
     max_body_bytes: int
+    max_import_bytes: int
 
     @property
     def timezone(self) -> ZoneInfo:
@@ -99,4 +100,5 @@ settings = Settings(
     port=_env_int("PORT", 8000),
     trust_proxy=_env_bool("TRUST_PROXY", False),
     max_body_bytes=_env_int("MAX_BODY_BYTES", 1_048_576),
+    max_import_bytes=_env_int("MAX_IMPORT_BYTES", 26_214_400),
 )

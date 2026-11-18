@@ -1,0 +1,197 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+{% set import_results = results|default(none) %}
+{% set import_summary = summary|default(none) %}
+{% set import_error = error|default(none) %}
+{% set has_import_results = (import_results is not none) or (import_summary is not none) %}
+
+{% macro results_card(result_items, result_summary) %}
+{% set status_labels = {"created": "已创建", "updated": "已更新", "skipped": "已跳过", "error": "失败"} %}
+<section class="admin-card import-results" aria-live="polite" aria-labelledby="import-results-title">
+  <div class="admin-card__head">
+    <h2 class="admin-card__title" id="import-results-title">导入结果</h2>
+    {% if result_summary %}
+    <span class="admin-card__hint">共处理 {{ result_summary.total }} 个文件</span>
+    {% endif %}
+  </div>
+
+  {% if result_summary %}
+  <div class="import-summary" role="group" aria-label="导入结果统计">
+    <span class="import-summary__item">总计 <span class="import-summary__value">{{ result_summary.total }}</span></span>
+    <span class="import-summary__item import-summary__item--ok">新建 <span class="import-summary__value">{{ result_summary.created }}</span></span>
+    <span class="import-summary__item import-summary__item--ok">更新 <span class="import-summary__value">{{ result_summary.updated }}</span></span>
+    <span class="import-summary__item import-summary__item--skip">跳过 <span class="import-summary__value">{{ result_summary.skipped }}</span></span>
+    <span class="import-summary__item import-summary__item--err">失败 <span class="import-summary__value">{{ result_summary.failed }}</span></span>
+  </div>
+  {% endif %}
+
+  {% if result_items %}
+  <ul class="import-result-list">
+    {% for item in result_items %}
+    {% set item_status = item.status if item.status in status_labels else "error" %}
+    <li class="import-result import-result--{{ item_status }}">
+      <div class="import-result__head">
+        <span class="import-result__file">{{ item.filename }}</span>
+        <span class="status-pill status-pill--{{ item_status }}">{{ status_labels[item_status] }}</span>
+        {% if item.title %}<span class="import-result__title">{{ item.title }}</span>{% endif %}
+        {% if item.slug %}<span class="import-result__slug">/post/{{ item.slug }}</span>{% endif %}
+      </div>
+      {% if item.message %}<p class="import-result__message">{{ item.message }}</p>{% endif %}
+      {% if item.edit_url or item.view_url %}
+      <div class="import-result__actions">
+        {% if item.edit_url %}<a class="admin-btn admin-btn--ghost admin-btn--sm" href="{{ item.edit_url }}">编辑</a>{% endif %}
+        {% if item.view_url %}<a class="admin-btn admin-btn--ghost admin-btn--sm" href="{{ item.view_url }}" target="_blank" rel="noopener">查看 ↗</a>{% endif %}
+      </div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty-state">
+    <span class="empty-state__icon" aria-hidden="true">⇪</span>
+    {% if result_summary %}没有可显示的结果。{% else %}还没有导入记录。选择 Markdown 文件并点击「开始导入」，这里会显示每个文件的处理结果。{% endif %}
+  </p>
+  {% endif %}
+</section>
+{% endmacro %}
+
+<div class="admin-page-head">
+  <div>
+    <h1 class="admin-page-title">{{ page_title }}</h1>
+    <p class="admin-page-sub">把本地 Markdown 文件批量导入为文章，自动解析 YAML frontmatter。</p>
+  </div>
+  <div class="admin-page-actions">
+    <a class="admin-btn admin-btn--ghost" href="/admin/posts">返回文章列表</a>
+  </div>
+</div>
+
+{% if import_error %}
+<div class="admin-alert admin-alert--err" role="alert">{{ import_error }}</div>
+{% endif %}
+
+{% if has_import_results %}{{ results_card(import_results, import_summary) }}{% endif %}
+
+<div class="import-layout">
+  <form class="import-form" id="import-form" action="/admin/import" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+    <section class="admin-card">
+      <div class="admin-card__head">
+        <h2 class="admin-card__title">选择文件</h2>
+        <span class="admin-card__hint">.md / .markdown / .txt · 单个 ≤ 5 MB · 最多 50 个</span>
+      </div>
+      <div class="admin-card__body">
+        <label class="import-drop" id="import-drop" for="import-files">
+          <input class="sr-only" id="import-files" name="files" type="file" multiple
+                 accept=".md,.markdown,.txt,text/markdown,text/plain"
+                 aria-describedby="import-files-hint">
+          <span class="import-drop__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" focusable="false">
+              <path d="M12 15V4M7 9l5-5 5 5"/>
+              <path d="M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/>
+            </svg>
+          </span>
+          <span class="import-drop__title">拖拽文件到这里，或 <span class="import-drop__cta">点击选择</span></span>
+          <span class="import-drop__hint" id="import-files-hint">支持一次选择多个文件；再次选择会追加到列表。</span>
+        </label>
+
+        <div class="import-files" id="import-files-panel" hidden>
+          <div class="import-files__head">
+            <h3 class="import-files__title">已选文件 <span class="import-files__count" id="import-files-count">0</span></h3>
+            <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" id="import-clear">清空</button>
+          </div>
+          <ul class="import-file-list" id="import-file-list" aria-label="已选文件列表"></ul>
+        </div>
+        <p class="import-note import-note--err" id="import-files-error" role="alert" hidden></p>
+      </div>
+    </section>
+
+    <section class="admin-card">
+      <div class="admin-card__head">
+        <h2 class="admin-card__title">导入选项</h2>
+        <span class="admin-card__hint">文件中已声明的设置优先</span>
+      </div>
+      <div class="admin-card__body">
+        <div class="form-grid">
+          <div class="field">
+            <label class="field__label" for="import-status">发布状态</label>
+            <select class="input" id="import-status" name="status">
+              <option value="published" selected>已发布（公开可见）</option>
+              <option value="draft">草稿（仅自己可见）</option>
+            </select>
+            <p class="field__hint">文件中写了 <code>status</code> 或 <code>draft</code> 时以文件为准。</p>
+          </div>
+          <div class="field">
+            <label class="field__label" for="import-on-conflict">Slug 冲突策略</label>
+            <select class="input" id="import-on-conflict" name="on_conflict">
+              <option value="skip" selected>跳过（保留已存在文章）</option>
+              <option value="overwrite">覆盖（更新已存在文章）</option>
+            </select>
+            <p class="field__hint">导入的 slug 与现有文章重复时生效。</p>
+          </div>
+          <div class="field field--full">
+            <label class="field__label" for="import-default-tags">默认标签</label>
+            <input class="input" id="import-default-tags" name="default_tags" type="text" maxlength="200"
+                   autocomplete="off" placeholder="用逗号分隔，例如：迁移,旧文">
+            <p class="field__hint">可留空；会附加到本次导入的每篇文章，与文件内标签合并去重。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <noscript>
+      <p class="import-note">当前浏览器未启用 JavaScript：仍可直接选择文件并提交，但不会显示已选文件列表与大小校验。</p>
+    </noscript>
+
+    <div class="import-actions">
+      <p class="field__hint" id="import-submit-hint">导入时会逐篇解析文件，处理结果会显示在下方。</p>
+      <button type="submit" class="admin-btn" id="import-submit">开始导入</button>
+    </div>
+  </form>
+
+  <aside class="import-aside" aria-label="导入说明">
+    <section class="admin-card import-help">
+      <div class="admin-card__head">
+        <h2 class="admin-card__title">frontmatter 说明</h2>
+      </div>
+      <div class="admin-card__body">
+        <p class="field__hint">文件开头可选的 YAML 区块：</p>
+        <pre class="import-help__code"><code>{% raw %}---
+title: 文章标题
+date: 2022-10-18T15:33:14+08:00
+tags: [技术, 随笔]
+slug: hello-world
+summary: 一句话摘要
+status: published
+---{% endraw %}</code></pre>
+        <ul class="import-help__list">
+          <li><strong>title</strong>：缺省时依次回退到正文第一个 <code>#</code> 标题、文件名。</li>
+          <li><strong>date</strong>：支持 ISO 8601 与常见日期格式，缺省使用导入时间。</li>
+          <li><strong>tags</strong>：YAML 列表或逗号分隔字符串，可与默认标签合并。</li>
+          <li><strong>slug</strong>：缺省时由标题自动生成；重复时按冲突策略处理。</li>
+          <li><strong>status / draft</strong>：优先于上方「发布状态」选项。</li>
+          <li><strong>summary</strong>：缺省时自动截取正文开头。</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="admin-card import-help">
+      <div class="admin-card__head">
+        <h2 class="admin-card__title">导入限制</h2>
+      </div>
+      <div class="admin-card__body">
+        <ul class="import-help__list">
+          <li>支持扩展名：<code>.md</code>、<code>.markdown</code>、<code>.txt</code>。</li>
+          <li>单个文件不超过 <strong>5 MB</strong>，一次最多 <strong>50 个</strong>。</li>
+          <li>每篇文件创建或更新一篇文章，不会删除现有内容。</li>
+          <li>正文图片请使用可公开访问的 URL，或先上传到站点静态目录。</li>
+        </ul>
+      </div>
+    </section>
+  </aside>
+</div>
+
+{% if not has_import_results %}{{ results_card(import_results, import_summary) }}{% endif %}
+{% endblock %}

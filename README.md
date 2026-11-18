@@ -11,6 +11,7 @@
 ## 目录
 
 - [功能特性](#功能特性)
+- [Markdown 导入](#markdown-导入)
 - [技术栈](#技术栈)
 - [快速开始（Docker）](#快速开始docker)
 - [本地开发](#本地开发)
@@ -30,6 +31,7 @@
 - **草稿 / 发布**：草稿仅后台可见，发布后进入首页、归档、标签、RSS 与 sitemap
 - **标签与归档**：标签聚合、按年份归档、按标签筛选
 - **站内搜索**：标题 / 摘要 / 正文关键词检索
+- **Markdown 导入**：后台上传多个 `.md`（支持 YAML frontmatter），可批量导入、保留原始日期与草稿状态
 - **RSS 与 sitemap**：自动生成 `/feed.xml`、`/sitemap.xml`、`/robots.txt`，便于订阅与搜索引擎收录
 - **关于页**：独立 Markdown 页面，可放作者简介与站点说明
 - **评论系统**：匿名评论，**默认需要后台审核**后才公开；内置蜜罐字段防垃圾评论
@@ -39,6 +41,38 @@
 - **响应式**：360px–1440px 自适应，手机 / 平板 / 桌面均可阅读
 - **无外部依赖**：不引用任何 CDN、在线字体、第三方 JS/CSS，可完全离线运行
 - **容器友好**：非 root（UID 10001）、`/data` 数据卷、`HEALTHCHECK`、优雅停机
+
+---
+
+## Markdown 导入
+
+后台导航「导入」（`/admin/import`），可拖拽或选择多个 Markdown 文件批量导入：
+
+- **支持格式**：`.md` / `.markdown` / `.txt`，单文件 ≤5MB，单次最多 50 个文件；正文 ≤200000 字符。
+- **frontmatter（可选）**：`title`、`date`、`tags`、`slug`、`summary`、`status` / `draft`。
+  缺省时标题回退到正文首个 `# H1` 或文件名，`slug` 由标题生成，摘要自动截取正文。
+- **日期**：支持 `2024-04-17T11:52:50+08:00`、`2024-04-17 11:52:50`、`2024-04-17`、Unix 时间戳；
+  无时区按 `SITE_TZ` 解释，页面按站点时区展示。
+- **选项**：默认发布状态（frontmatter 中的 `status`/`draft` 优先）、默认标签、slug 冲突策略（跳过 / 覆盖）。
+- **结果**：逐条显示新建 / 更新 / 跳过 / 失败，并附文章编辑链接。
+
+```markdown
+---
+title: 我的第一篇文章
+date: 2024-04-17 11:52:50
+tags: [随笔, 技术]
+slug: my-first-post
+summary: 一句话摘要
+status: published
+---
+
+# 正文标题
+
+正文内容……
+```
+
+**从 Halo / Hexo / Hugo 等博客迁移**：先从原博客导出 Markdown（保留 frontmatter），再批量导入；
+图片建议上传到数据卷的 `/data/uploads/`，Markdown 中用 `/uploads/图片名` 引用即可随站点一起提供。
 
 ---
 
@@ -152,6 +186,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 | `ADMIN_PASSWORD` | 随机生成 | 首次初始化管理员密码；留空时随机生成并写入 `/data/initial_admin_password.txt`、打印到启动日志 |
 | `TRUST_PROXY` | `false` | 反向代理后设为 `true`，从 `X-Forwarded-For` 取真实客户端 IP（限流用）；直连时保持 `false` 防伪造 |
 | `MAX_BODY_BYTES` | `1048576` | 单次请求体大小上限（字节），超限返回 413 |
+| `MAX_IMPORT_BYTES` | `26214400` | 后台 Markdown 多文件导入的请求体上限（默认 25MiB） |
 | `SITE_URL` | `http://localhost:8080` | RSS / sitemap 绝对链接前缀，部署公网时改成真实域名 |
 | `SITE_TZ` | `Asia/Shanghai` | 展示时区（数据库始终以 UTC 存储） |
 | `BLOG_PORT` | `8080` | 宿主机映射端口（容器内固定 8000） |

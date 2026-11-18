@@ -26,6 +26,7 @@ myblog/
 │   ├── repo.py                     # Lead
 │   ├── utils.py                    # Lead
 │   ├── markdown_render.py          # Lead
+│   ├── frontmatter.py              # Lead（Markdown 导入用）
 │   ├── routes_public.py            # Lead
 │   ├── routes_admin.py             # Lead
 │   ├── main.py                     # Lead
@@ -193,6 +194,8 @@ Jinja 环境：`autoescape=True`、`trim_blocks`、`lstrip_blocks`。**未定义
 | POST | `/admin/settings` | — | 保存站点设置 |
 | POST | `/admin/password` | — | 修改密码 |
 | POST | `/admin/preview` | JSON | `{"html": "..."}`，编辑页实时预览 |
+| GET | `/admin/import` | admin/import.html | Markdown 批量导入页 |
+| POST | `/admin/import` | admin/import.html | multipart 多文件导入 |
 
 后台写操作全部要求 POST + CSRF 隐藏字段 `csrf_token`（与 `csrf` 值一致），不匹配 → 400。
 所有 POST 成功后 303 重定向并带 `?ok=`；错误带 `?err=`（或回显 `error` 变量）。
@@ -231,6 +234,17 @@ Jinja 环境：`autoescape=True`、`trim_blocks`、`lstrip_blocks`。**未定义
 - 设置：`site_title,site_subtitle,site_description,author_name,author_bio,footer_text,about_md,posts_per_page,allow_comments,csrf_token`；`allow_comments` 复选框 value=`1`（不勾选即关闭）
 - 密码：`current_password,new_password,confirm_password,csrf_token`
 - 登录：`username,password,csrf_token`
+
+### Markdown 导入
+
+- 请求：`POST /admin/import`，`multipart/form-data`；字段 `files`（可多个，`.md/.markdown/.txt`，单文件 ≤5MB，最多 50 个）、`status`（`published|draft`，默认 published）、`default_tags`（逗号分隔，可空）、`on_conflict`（`skip|overwrite`，默认 skip）、`csrf_token`。
+- 每个文件解析 YAML frontmatter（`title/date/tags/slug/summary/status/draft` 等），无 frontmatter 时回退到首个 `# H1` 或文件名；日期支持 ISO、`YYYY-MM-DD HH:MM:SS`、时间戳，无时区按站点时区解释；slug 缺失时由标题生成。
+- 结果：渲染 `admin/import.html`，上下文 `results`（list[{filename,status,message,title,slug,edit_url,view_url}]，status ∈ `created|updated|skipped|error`）、`summary`（{total,created,updated,skipped,failed}）、`error`。
+- 安全：登录态 + CSRF；请求体上限由 `MAX_IMPORT_BYTES`（默认 25MiB）控制；正文上限 200000 字符。
+
+### 上传图片
+
+迁移/导入后的图片存放在数据目录的 `uploads/`，通过 `GET /uploads/<path>` 只读提供（`/data/uploads`，随数据卷持久化）。
 
 ### 状态码语义（flash 码）
 `?ok=`：`saved`(已保存) `deleted`(已删除) `published`(已发布) `unpublished`(已转为草稿) `approved` `comment_deleted` `settings_saved` `password_changed` `login` `logged_out` `comment`(评论已提交，待审核)
@@ -316,6 +330,7 @@ Jinja 环境：`autoescape=True`、`trim_blocks`、`lstrip_blocks`。**未定义
 | `SESSION_MAX_AGE` | `604800`（7 天） | 会话有效期（秒） |
 | `TRUST_PROXY` | `false` | 反向代理后从 X-Forwarded-For 取真实 IP（限流用） |
 | `MAX_BODY_BYTES` | `1048576` | 单次请求体上限（字节） |
+| `MAX_IMPORT_BYTES` | `26214400` | 后台 Markdown 导入请求体上限（多文件上传，默认 25MiB） |
 
 ## 12. 质量门槛与自检
 

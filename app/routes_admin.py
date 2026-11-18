@@ -1,10 +1,14 @@
-"""后台路由：登录、仪表盘、文章 CRUD、评论审核、站点设置、Markdown 预览。"""
+"""后台路由：登录、仪表盘、文章 CRUD、评论审核、站点设置、Markdown 预览与导入。"""
 
 from __future__ import annotations
 
 import hmac
+import logging
+import secrets
 import math
-from urllib.parse import urlencode
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import (
@@ -14,10 +18,13 @@ from fastapi.responses import (
     RedirectResponse,
 )
 
-from . import auth, repo
+from . import auth, frontmatter, repo
 from .config import settings
 from .markdown_render import render_markdown
 from .templating import render_admin
+from .utils import normalize_tags, slugify
+
+logger = logging.getLogger("paper.import")
 
 router = APIRouter()
 
@@ -511,3 +518,231 @@ async def preview(request: Request):
     form = await request.form()
     content = str(form.get("content_md") or "")[:200000]
     return JSONResponse({"html": str(render_markdown(content))})
+
+
+# ---------------------------------------------------------------- Markdown 导入
+
+IMPORT_MAX_FILES = 50
+IMPORT_MAX_FILE_BYTES = 5 * 1024 * 1024
+IMPORT_MAX_CONTENT_CHARS = 200_000
+IMPORT_ALLOWED_SUFFIXES = {".md", ".markdown", ".txt"}
+
+
+def _import_error(filename: str, message: str) -> dict:
+    return {
+        "filename": filename,
+        "status": "error",
+        "message": message,
+        "title": "",
+        "slug": "",
+        "edit_url": "",
+        "view_url": "",
+    }
+
+
+def _decode_text(raw: bytes) -> str:
+    for encoding in ("utf-8-sig", "utf-8", "gb18030"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    raise ValueError("无法识别文件编码，请使用 UTF-8")
+
+
+async def _import_markdown_file(
+    upload, default_status: str, on_conflict: str, default_tags: str
+) -> dict:
+    filename = Path(upload.filename or "untitled.md").name
+    if Path(filename).suffix.lower() not in IMPORT_ALLOWED_SUFFIXES:
+        return _import_error(filename, "仅支持 .md / .markdown / .txt 文件")
+
+    try:
+        raw = await upload.read()
+    except Exception:  # noqa: BLE001 - 上传流异常统一转换为该文件的错误结果
+        return _import_error(filename, "读取上传文件失败")
+    if not raw:
+        return _import_error(filename, "文件内容为空")
+    if len(raw) > IMPORT_MAX_FILE_BYTES:
+        return _import_error(filename, "单个文件不能超过 5MB")
+
+    try:
+        text = _decode_text(raw)
+    except ValueError as exc:
+        return _import_error(filename, str(exc))
+    if "\x00" in text:
+        return _import_error(filename, "文件看起来不是文本文件")
+
+    try:
+        data, body = frontmatter.split_frontmatter(text)
+    except frontmatter.FrontmatterError as exc:
+        return _import_error(filename, str(exc))
+
+    content = body.strip("\n").strip()
+    if not content:
+        return _import_error(filename, "正文内容为空，已跳过")
+    if len(content) > IMPORT_MAX_CONTENT_CHARS:
+        return _import_error(filename, "正文超过 200000 字符限制")
+
+    title = frontmatter.extract_title(data, content, Path(filename).stem)
+    if not title:
+        return _import_error(filename, "无法确定文章标题")
+
+    status = frontmatter.resolve_status(data, default_status)
+    tags = normalize_tags(
+        ",".join(frontmatter.extract_tags(data) + [default_tags])
+    )
+    summary = frontmatter.extract_summary(data)
+    published_at = frontmatter.extract_published_at(data)
+    slug = frontmatter.extract_slug(data) or slugify(title)
+    if not slug:
+        slug = (
+            "imported-"
+            + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            + "-"
+            + secrets.token_hex(3)
+        )
+
+    existing = repo.get_post_by_slug(slug)
+    post_id: int | None = None
+    result_status = "created"
+    if existing is not None:
+        if on_conflict == "skip":
+            return {
+                "filename": filename,
+                "status": "skipped",
+                "message": "slug 已存在，已跳过",
+                "title": existing["title"],
+                "slug": existing["slug"],
+                "edit_url": f"/admin/posts/{existing['id']}/edit",
+                "view_url": (
+                    f"/post/{quote(existing['slug'])}"
+                    if existing["status"] == "published"
+                    else ""
+                ),
+            }
+        post_id = int(existing["id"])
+        result_status = "updated"
+
+    saved_id = repo.save_post(
+        post_id=post_id,
+        title=title,
+        slug=slug,
+        summary=summary,
+        tags=tags,
+        content_md=content,
+        status=status,
+        published_at=published_at,
+    )
+    if saved_id is None:
+        return _import_error(filename, "保存失败：目标文章不存在")
+
+    saved = repo.get_post_by_id(saved_id)
+    if saved is None:
+        return _import_error(filename, "保存后无法读取文章")
+    return {
+        "filename": filename,
+        "status": result_status,
+        "message": "已更新" if result_status == "updated" else "已导入",
+        "title": saved["title"],
+        "slug": saved["slug"],
+        "edit_url": f"/admin/posts/{saved_id}/edit",
+        "view_url": (
+            f"/post/{quote(saved['slug'])}" if saved["status"] == "published" else ""
+        ),
+    }
+
+
+@router.get("/admin/import", response_class=HTMLResponse)
+def import_page(request: Request):
+    if not _current_user(request):
+        return _login_redirect()
+    return render_admin(
+        request,
+        "admin/import.html",
+        active_nav="import",
+        results=None,
+        summary=None,
+        error=None,
+        page_title="导入",
+    )
+
+
+@router.post("/admin/import")
+async def import_markdown(request: Request):
+    if not _current_user(request):
+        return _login_redirect()
+    form = await request.form()
+    if not _csrf_ok(request, form):
+        return PlainTextResponse("CSRF 校验失败", status_code=400)
+
+    uploads = [
+        item
+        for item in form.getlist("files")
+        if hasattr(item, "filename") and hasattr(item, "read")
+    ]
+    status_default = str(form.get("status") or "published").strip().lower()
+    if status_default not in ("published", "draft"):
+        status_default = "published"
+    on_conflict = str(form.get("on_conflict") or "skip").strip().lower()
+    if on_conflict not in ("skip", "overwrite"):
+        on_conflict = "skip"
+    default_tags = normalize_tags(str(form.get("default_tags") or "")[:300])
+
+    if not uploads:
+        return render_admin(
+            request,
+            "admin/import.html",
+            active_nav="import",
+            results=None,
+            summary=None,
+            error="请选择至少一个 Markdown 文件（.md / .markdown / .txt）。",
+            page_title="导入",
+            status_code=400,
+        )
+    if len(uploads) > IMPORT_MAX_FILES:
+        return render_admin(
+            request,
+            "admin/import.html",
+            active_nav="import",
+            results=None,
+            summary=None,
+            error="一次最多导入 50 个文件，请分批上传。",
+            page_title="导入",
+            status_code=400,
+        )
+
+    results: list[dict] = []
+    for upload in uploads:
+        try:
+            results.append(
+                await _import_markdown_file(
+                    upload, status_default, on_conflict, default_tags
+                )
+            )
+        except Exception:  # noqa: BLE001 - 单个文件失败不影响其余文件
+            logger.exception(
+                "导入文件失败：%s", getattr(upload, "filename", "?")
+            )
+            results.append(
+                _import_error(
+                    Path(str(getattr(upload, "filename", "untitled"))).name,
+                    "导入失败，请查看服务端日志",
+                )
+            )
+
+    summary = {
+        "total": len(results),
+        "created": sum(1 for item in results if item["status"] == "created"),
+        "updated": sum(1 for item in results if item["status"] == "updated"),
+        "skipped": sum(1 for item in results if item["status"] == "skipped"),
+        "failed": sum(1 for item in results if item["status"] == "error"),
+    }
+    return render_admin(
+        request,
+        "admin/import.html",
+        active_nav="import",
+        results=results,
+        summary=summary,
+        error=None,
+        page_title="导入",
+    )

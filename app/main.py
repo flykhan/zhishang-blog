@@ -24,6 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger("paper")
 
 BASE_DIR = Path(__file__).resolve().parent
+UPLOADS_DIR = Path(settings.db_path).expanduser().resolve().parent / "uploads"
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -49,6 +50,7 @@ def apply_security_headers(response) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     db.init_db()
     # 默认占位密码只用于启动告警提示，不是真实凭据。
     if settings.admin_password == "admin123":  # nosec B105
@@ -68,6 +70,11 @@ app = FastAPI(
 )
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+app.mount(
+    "/uploads",
+    StaticFiles(directory=str(UPLOADS_DIR), check_dir=False),
+    name="uploads",
+)
 
 
 @app.middleware("http")
@@ -77,13 +84,18 @@ async def attach_context(request: Request, call_next):
     # 1) 请求体大小限制：阻挡未认证的巨型表单（防内存 / worker DoS）。
     if request.method in {"POST", "PUT", "PATCH"}:
         raw_length = request.headers.get("content-length", "")
-        if raw_length.isdigit() and int(raw_length) > settings.max_body_bytes:
+        body_limit = (
+            settings.max_import_bytes
+            if path == "/admin/import"
+            else settings.max_body_bytes
+        )
+        if raw_length.isdigit() and int(raw_length) > body_limit:
             response = PlainTextResponse("请求体过大", status_code=413)
             apply_security_headers(response)
             return response
 
     # 2) 静态资源不需要会话校验，避免每个 CSS/JS 请求都查询数据库。
-    if path.startswith("/static/"):
+    if path.startswith("/static/") or path.startswith("/uploads/"):
         request.state.user = None
         request.state.csrf = ""
         response = await call_next(request)

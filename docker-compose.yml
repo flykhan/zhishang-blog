@@ -47,6 +47,8 @@ services:
       TRUST_PROXY: "${TRUST_PROXY:-false}"
       # 单次请求体上限（字节），默认 1 MiB
       MAX_BODY_BYTES: "${MAX_BODY_BYTES:-1048576}"
+      # Markdown 导入请求体上限（多文件上传，默认 25MiB）
+      MAX_IMPORT_BYTES: "${MAX_IMPORT_BYTES:-26214400}"
       # 会话有效期（秒）
       SESSION_MAX_AGE: "${SESSION_MAX_AGE:-604800}"
       # SECRET_KEY 无缺省值：不在此设置，由 .env（env_file）注入；

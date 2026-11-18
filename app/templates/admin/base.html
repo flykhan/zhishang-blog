@@ -52,6 +52,8 @@
            href="/admin/posts"{% if nav_active == 'posts' %} aria-current="page"{% endif %}>文章</a>
         <a class="admin-nav__link{% if nav_active == 'new' %} is-active{% endif %}"
            href="/admin/posts/new"{% if nav_active == 'new' %} aria-current="page"{% endif %}>写文章</a>
+        <a class="admin-nav__link{% if nav_active == 'import' %} is-active{% endif %}"
+           href="/admin/import"{% if nav_active == 'import' %} aria-current="page"{% endif %}>导入</a>
         <a class="admin-nav__link{% if nav_active == 'comments' %} is-active{% endif %}"
            href="/admin/comments"{% if nav_active == 'comments' %} aria-current="page"{% endif %}>评论{% if pending > 0 %}<span class="admin-badge" aria-hidden="true">{{ pending }}</span><span class="sr-only">（{{ pending }} 条待审核）</span>{% endif %}</a>
         <a class="admin-nav__link{% if nav_active == 'settings' %} is-active{% endif %}"
